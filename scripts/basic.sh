@@ -1,0 +1,12 @@
+cargo run --\
+  --station a\
+  --station b\
+  --station c\
+  --station d\
+  --route ab,a,b,20\
+  --route bc,b,c,10\
+  --route cd,c,d,60\
+  --route da,d,a,20\
+  --package p1,5,a,c\
+  --package p2,5,d,c\
+  --train t1,10,b\
