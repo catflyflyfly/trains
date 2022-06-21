@@ -24,8 +24,7 @@ pub struct Station {
 #[derive(Debug, Clone)]
 pub struct Route {
     pub name: String,
-    pub station1_name: String,
-    pub station2_name: String,
+    pub station_pair_name: (String, String),
     pub duration_mins: u32,
 }
 
@@ -33,8 +32,7 @@ pub struct Route {
 pub struct Package {
     pub name: String,
     pub weight: u32,
-    pub start_station_name: String,
-    pub destination_station_name: String,
+    pub station_pair_name: (String, String),
 }
 
 #[derive(Debug, Clone)]
@@ -66,8 +64,7 @@ pub mod parser {
         {
             Ok(Route {
                 name: name.to_string(),
-                station1_name: station1_name.to_string(),
-                station2_name: station2_name.to_string(),
+                station_pair_name: (station1_name.to_string(), station2_name.to_string()),
                 duration_mins: duration_mins.parse().map_err(|error| {
                     anyhow!("parse duration_mins `{duration_mins}` fail with error `{error}`")
                 })?,
@@ -86,8 +83,10 @@ pub mod parser {
                 weight: weight.parse().map_err(|error| {
                     anyhow!("parse weight `{weight}` fail with error `{error}`")
                 })?,
-                start_station_name: start_station_name.to_string(),
-                destination_station_name: destination_station_name.to_string(),
+                station_pair_name: (
+                    start_station_name.to_string(),
+                    destination_station_name.to_string(),
+                ),
             })
         } else {
             bail!("[NAME],[WEIGHT],[START],[DESTINATION]")

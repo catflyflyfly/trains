@@ -60,8 +60,7 @@ impl From<args::Station> for Station {
 #[derive(Debug, Clone)]
 pub struct Route {
     pub name: String,
-    pub station1: Station,
-    pub station2: Station,
+    pub station_pair: (Station, Station),
     pub duration_mins: u32,
 }
 
@@ -71,18 +70,18 @@ impl TryFrom<(args::Route, &[Station])> for Route {
     fn try_from((route, stations): (args::Route, &[Station])) -> Result<Self, Self::Error> {
         let args::Route {
             name,
-            station1_name,
-            station2_name,
+            station_pair_name: (from_name, to_name),
             duration_mins,
         } = route;
 
-        let station1 = find_station(stations, station1_name)?;
-        let station2 = find_station(stations, station2_name)?;
+        let station_pair = (
+            find_station(stations, from_name)?,
+            find_station(stations, to_name)?,
+        );
 
         Ok(Self {
             name,
-            station1,
-            station2,
+            station_pair,
             duration_mins,
         })
     }
@@ -100,8 +99,7 @@ fn find_station(stations: &[Station], station_name: String) -> Result<Station> {
 pub struct Package {
     pub name: String,
     pub weight: u32,
-    pub start_station: Station,
-    pub destination_station: Station,
+    pub station_pair: (Station, Station),
 }
 
 impl TryFrom<(args::Package, &[Station])> for Package {
@@ -111,18 +109,18 @@ impl TryFrom<(args::Package, &[Station])> for Package {
         let args::Package {
             name,
             weight,
-            start_station_name,
-            destination_station_name,
+            station_pair_name: (from_name, to_name),
         } = package;
 
-        let start_station = find_station(stations, start_station_name)?;
-        let destination_station = find_station(stations, destination_station_name)?;
+        let station_pair = (
+            find_station(stations, from_name)?,
+            find_station(stations, to_name)?,
+        );
 
         Ok(Self {
             name,
             weight,
-            start_station,
-            destination_station,
+            station_pair,
         })
     }
 }
