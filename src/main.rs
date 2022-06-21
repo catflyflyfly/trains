@@ -8,7 +8,7 @@ fn main() -> Result<()> {
     let network_args = args::Network::parse();
     let network = model::Network::try_from(network_args)?;
 
-    println!("{:#?}", network);
+    network.print_all_shortest_routes();
 
     Ok(())
 }

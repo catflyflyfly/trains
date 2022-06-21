@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, bail, Error, Result};
+use itertools::zip;
 use itertools::Itertools;
 
 use crate::args;
@@ -13,6 +14,47 @@ pub struct Network {
     pub trains: Vec<Train>,
 }
 
+impl Network {
+    pub fn print_all_shortest_routes(&self) {
+        let all = self
+            .stations
+            .iter()
+            .map(|station| {
+                (
+                    station.clone(),
+                    pathfinding::prelude::dijkstra_all(station, |s| self.reachable_stations(s)),
+                )
+            })
+            .collect_vec();
+
+        println!("{:#?}", all)
+    }
+
+    fn routes_from(&self, station: &Station) -> Vec<&Route> {
+        self.routes
+            .iter()
+            .filter(|route| route.is_involve_station(station))
+            .collect_vec()
+    }
+
+    fn reachable_stations(&self, station: &Station) -> Vec<(Station, u32)> {
+        let involved_routes = self.routes_from(station);
+
+        let available_stations = involved_routes
+            .iter()
+            .map(|route| route.corresponding_station(station))
+            .collect::<Result<Vec<_>>>()
+            .unwrap()
+            .into_iter()
+            .map(|st| st.to_owned())
+            .collect_vec();
+
+        let duration_mins = involved_routes.into_iter().map(|route| route.duration_mins);
+
+        zip(available_stations, duration_mins).collect_vec()
+    }
+}
+
 impl TryFrom<args::Network> for Network {
     type Error = Error;
 
@@ -23,19 +65,19 @@ impl TryFrom<args::Network> for Network {
             .routes
             .into_iter()
             .map(|route| Route::try_from((route, stations.deref())))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>>>()?;
 
         let packages = input
             .packages
             .into_iter()
             .map(|package| Package::try_from((package, stations.deref())))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>>>()?;
 
         let trains = input
             .trains
             .into_iter()
             .map(|train| Train::try_from((train, stations.deref())))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(Self {
             stations,
@@ -64,6 +106,25 @@ pub struct Route {
     pub duration_mins: u32,
 }
 
+impl Route {
+    fn is_involve_station(&self, station: &Station) -> bool {
+        let (from, to) = &self.station_pair;
+
+        return from.name == station.name || to.name == station.name;
+    }
+
+    fn corresponding_station(&self, station: &Station) -> Result<&Station> {
+        match &self.station_pair {
+            (from, to) if from.name == station.name => Ok(&to),
+            (from, to) if to.name == station.name => Ok(&from),
+            _ => bail!(
+                "this station {} is not the part of this route",
+                station.name
+            ),
+        }
+    }
+}
+
 impl TryFrom<(args::Route, &[Station])> for Route {
     type Error = Error;
 
@@ -85,14 +146,6 @@ impl TryFrom<(args::Route, &[Station])> for Route {
             duration_mins,
         })
     }
-}
-
-fn find_station(stations: &[Station], station_name: String) -> Result<Station> {
-    Ok(stations
-        .iter()
-        .find(|station| station.name == station_name)
-        .ok_or_else(|| anyhow!("station not found: {station_name}"))?
-        .clone())
 }
 
 #[derive(Debug, Clone)]
@@ -150,4 +203,12 @@ impl TryFrom<(args::Train, &[Station])> for Train {
             initial_station,
         })
     }
+}
+
+fn find_station(stations: &[Station], station_name: String) -> Result<Station> {
+    Ok(stations
+        .iter()
+        .find(|station| station.name == station_name)
+        .ok_or_else(|| anyhow!("station not found: {station_name}"))?
+        .clone())
 }
