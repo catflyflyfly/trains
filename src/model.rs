@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::Deref;
 
 use anyhow::{anyhow, bail, Error, Result};
@@ -27,19 +28,52 @@ impl Network {
         vec![]
     }
 
-    pub fn print_all_shortest_routes(&self) {
-        let all = self
-            .stations
+    pub fn all_shortest_route_paths(&self) -> Vec<RoutePath> {
+        self.stations
             .iter()
-            .map(|station| {
-                (
-                    station.clone(),
-                    pathfinding::prelude::dijkstra_all(station, |s| self.reachable_stations(s)),
-                )
-            })
-            .collect_vec();
+            .map(|station| self.shortest_route_paths(station))
+            .flatten()
+            .collect_vec()
+    }
 
-        println!("{:#?}", all)
+    fn shortest_route_paths(&self, from: &Station) -> Vec<RoutePath> {
+        fn shortest_station_seq(
+            from: &Station,
+            to: &Station,
+            reachable_by: &HashMap<Station, (Station, u32)>,
+        ) -> Vec<Station> {
+            let mut stations: Vec<Station> = vec![to.clone()];
+            let mut to = to;
+
+            loop {
+                let prev_station = &reachable_by
+                    .get(to)
+                    .ok_or_else(|| format!("{}", to.name))
+                    .unwrap()
+                    .0;
+
+                stations.push(prev_station.clone());
+
+                if stations.last().unwrap() == from {
+                    break;
+                }
+
+                to = prev_station
+            }
+
+            stations
+        }
+
+        let reachable_stations =
+            pathfinding::prelude::dijkstra_all(from, |to| self.reachable_stations(to));
+
+        reachable_stations
+            .keys()
+            .map(|to| shortest_station_seq(from, to, &reachable_stations))
+            .map(|station_seq| {
+                RoutePath::try_from((station_seq.deref(), self.routes.deref())).unwrap()
+            })
+            .collect_vec()
     }
 
     fn routes_from(&self, station: &Station) -> Vec<&Route> {
@@ -122,13 +156,13 @@ impl Route {
     fn is_involve_station(&self, station: &Station) -> bool {
         let (from, to) = &self.station_pair;
 
-        return from.name == station.name || to.name == station.name;
+        return from == station || to == station;
     }
 
     fn corresponding_station(&self, station: &Station) -> Result<&Station> {
         match &self.station_pair {
-            (from, to) if from.name == station.name => Ok(&to),
-            (from, to) if to.name == station.name => Ok(&from),
+            (from, to) if from == station => Ok(&to),
+            (from, to) if to == station => Ok(&from),
             _ => bail!(
                 "this station {} is not the part of this route",
                 station.name
@@ -218,6 +252,47 @@ impl TryFrom<(args::Train, &[Station])> for Train {
 }
 
 #[derive(Debug, Clone)]
+pub struct RoutePath {
+    pub station_pair: (Station, Station),
+    pub routes: Vec<Route>,
+}
+
+impl RoutePath {
+    fn total_duration_mins(&self) -> u32 {
+        self.routes.iter().map(|route| route.duration_mins).sum()
+    }
+}
+
+impl TryFrom<(&[Station], &[Route])> for RoutePath {
+    type Error = Error;
+
+    fn try_from((stations, all_routes): (&[Station], &[Route])) -> Result<Self, Self::Error> {
+        let first = stations.first().unwrap();
+        let last = stations.last().unwrap();
+
+        let stations_except_first = stations.iter().skip(1);
+        let stations_except_last = stations.iter().take(stations.len() - 1);
+
+        let station_pairs_chain = zip(stations_except_last, stations_except_first);
+
+        let routes = station_pairs_chain
+            .map(|(from, to)| {
+                all_routes
+                    .iter()
+                    .find(|route| route.is_involve_station(from) && route.is_involve_station(to))
+                    .unwrap()
+                    .clone()
+            })
+            .collect_vec();
+
+        Ok(Self {
+            station_pair: (first.clone(), last.clone()),
+            routes,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Schedule {
     pub begin_at: u32,
     pub train: Train,
@@ -252,6 +327,19 @@ pub mod test {
         let args = case::simple_choice();
 
         let network = Network::try_from(args).unwrap();
+
+        let routes = network.all_shortest_route_paths();
+        let len = routes.len();
+
+        routes.iter().for_each(|route| {
+            println!(
+                "From: {} \t To: {} \t Durations: {}",
+                route.station_pair.0.name,
+                route.station_pair.1.name,
+                route.total_duration_mins()
+            )
+        });
+        println!("route count: {:#?}", len);
 
         assert_eq!(network.shortest_schedules_time(), 30);
     }
