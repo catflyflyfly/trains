@@ -29,11 +29,28 @@ impl Network {
     }
 
     pub fn all_shortest_route_paths(&self) -> Vec<RoutePath> {
-        self.stations
+        let self_route_paths = self
+            .stations
+            .iter()
+            .map(|station| RoutePath {
+                station_pair: (station.clone(), station.clone()),
+                routes: vec![Route {
+                    name: format!("iden#{}", station.name),
+                    station_pair: (station.clone(), station.clone()),
+                    duration_mins: 0,
+                }],
+            })
+            .collect_vec();
+
+        let out_route_paths = self
+            .stations
             .iter()
             .map(|station| self.shortest_route_paths(station))
             .flatten()
-            .collect_vec()
+            .unique()
+            .collect_vec();
+
+        vec![self_route_paths, out_route_paths].concat()
     }
 
     fn shortest_route_paths(&self, from: &Station) -> Vec<RoutePath> {
@@ -152,6 +169,20 @@ pub struct Route {
     pub duration_mins: u32,
 }
 
+impl PartialEq for Route {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for Route {}
+
+impl std::hash::Hash for Route {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+
 impl Route {
     fn is_involve_station(&self, station: &Station) -> bool {
         let (from, to) = &self.station_pair;
@@ -251,7 +282,7 @@ impl TryFrom<(args::Train, &[Station])> for Train {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RoutePath {
     pub station_pair: (Station, Station),
     pub routes: Vec<Route>,
