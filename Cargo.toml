@@ -9,5 +9,6 @@ edition = "2021"
 anyhow = "1"
 itertools = "0.10"
 clap = { version = "3.2.5", features = ["derive"] }
+derive_builder = "0.11"
 
 pathfinding = "3"

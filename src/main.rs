@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate derive_builder;
+
 use anyhow::Result;
 use clap::Parser;
 

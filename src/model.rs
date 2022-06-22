@@ -18,12 +18,12 @@ pub struct Network {
 }
 
 impl Network {
-    pub fn shortest_time(&self) -> u32 {
+    pub fn optimal_time_mins(&self) -> u32 {
         self.solve().1
     }
 
-    pub fn shortest_steps(&self) -> Vec<Step> {
-        vec![]
+    pub fn optimal_instructions(&self) -> Vec<Instruction> {
+        self.solve().0.last().unwrap().instructions()
     }
 
     pub fn all_shortest_route_paths_map(&self) -> HashMap<(Station, Station), RoutePath> {
@@ -181,6 +181,14 @@ impl std::hash::Hash for Route {
 }
 
 impl Route {
+    pub fn from(&self) -> &Station {
+        &self.station_pair.0
+    }
+
+    pub fn to(&self) -> &Station {
+        &self.station_pair.1
+    }
+
     fn is_involve_station(&self, station: &Station) -> bool {
         let (from, to) = &self.station_pair;
 
@@ -308,6 +316,17 @@ impl RoutePath {
     }
 }
 
+#[derive(Debug, Clone, Builder)]
+pub struct Instruction {
+    pub begin_at: u32,
+    pub train: Train,
+    pub route: Route,
+    #[builder(setter(into, strip_option), default)]
+    pub picked_package: Option<Package>,
+    #[builder(setter(into, strip_option), default)]
+    pub dropped_package: Option<Package>,
+}
+
 impl TryFrom<(&[Station], &[Route])> for RoutePath {
     type Error = Error;
 
@@ -340,8 +359,6 @@ impl TryFrom<(&[Station], &[Route])> for RoutePath {
 pub mod state {
     use std::cmp::Ordering;
     use std::collections::HashSet;
-
-    use itertools::Either;
 
     use super::*;
 
@@ -416,6 +433,13 @@ pub mod state {
 
         pub(super) fn is_success(&self) -> bool {
             self.available_actions().is_empty()
+        }
+
+        pub fn instructions(&self) -> Vec<Instruction> {
+            self.train_states
+                .iter()
+                .flat_map(|state| state.instructions(&self.optimal_route_paths_map))
+                .collect_vec()
         }
 
         fn action_successor_states(&self, action: &state::Action) -> Vec<(state::Network, u32)> {
@@ -505,19 +529,6 @@ pub mod state {
             self.taken_actions.push(action.clone())
         }
 
-        fn current_packages(&self) -> HashSet<Package> {
-            let (picked_packages, dropped_packages): (HashSet<_>, HashSet<_>) =
-                self.taken_actions.iter().partition_map(|r| match r {
-                    Action::Pick(p, _) => Either::Left(p),
-                    Action::Drop(p, _) => Either::Right(p),
-                });
-
-            picked_packages
-                .difference(&dropped_packages)
-                .map(|package| package.clone().clone())
-                .collect()
-        }
-
         fn optimal_duration_mins(
             &self,
             optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
@@ -558,22 +569,65 @@ pub mod state {
                 .map(|pair| optimal_route_paths_map.get(&pair).unwrap().clone())
                 .collect_vec()
         }
-    }
-}
 
-#[derive(Debug, Clone)]
-pub struct Step {
-    pub begin_at: u32,
-    pub train: Train,
-    pub route: Route,
-    pub destination: Station,
-    pub picked_packages: Vec<Package>,
-    pub dropped_packages: Vec<Package>,
-}
+        fn sub_instructions(
+            &self,
+            route_path: &RoutePath,
+            action: &state::Action,
+            begin_at: u32,
+        ) -> Vec<Instruction> {
+            let route_len = route_path.routes.len();
 
-impl Step {
-    fn end_at(&self) -> u32 {
-        self.begin_at + self.route.duration_mins
+            let is_last = |index: usize| route_len - 1 == index;
+
+            let mut begin_at = begin_at;
+
+            route_path
+                .routes
+                .iter()
+                .enumerate()
+                .map(|(index, route)| {
+                    let mut builder = InstructionBuilder::default();
+
+                    let _ = &builder
+                        .begin_at(begin_at)
+                        .train(self.train.clone())
+                        .route(route.clone());
+
+                    let _ = match (is_last(index), action) {
+                        (false, _) => &builder,
+                        (true, Action::Pick(p, _)) => &builder.picked_package(p.clone()),
+                        (true, Action::Drop(p, _)) => &builder.dropped_package(p.clone()),
+                    };
+
+                    let instruction = builder.build().unwrap();
+
+                    begin_at += route.duration_mins;
+
+                    instruction
+                })
+                .collect_vec()
+        }
+
+        fn instructions(
+            &self,
+            optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
+        ) -> Vec<Instruction> {
+            let route_paths = self.optimal_route_paths(optimal_route_paths_map);
+            let taken_actions = &self.taken_actions;
+
+            let mut begin_at = 0;
+
+            zip(route_paths, taken_actions)
+                .flat_map(|(route_path, action)| {
+                    let instructions = self.sub_instructions(&route_path, &action, begin_at);
+
+                    begin_at += route_path.total_duration_mins();
+
+                    instructions
+                })
+                .collect_vec()
+        }
     }
 }
 
@@ -597,11 +651,9 @@ pub mod test {
 
         let network = Network::try_from(args).unwrap();
 
-        let (a, b) = network.solve();
+        println!("{:#?}", network.optimal_instructions());
+        println!("{:#?}", network.optimal_time_mins());
 
-        println!("{:#?}", a.last());
-        println!("{:#?}", b);
-
-        assert_eq!(b, 30);
+        assert_eq!(network.optimal_time_mins(), 30);
     }
 }
