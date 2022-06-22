@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::Deref;
 
 use anyhow::{anyhow, bail, Error, Result};
@@ -26,6 +27,17 @@ impl Network {
 
     pub fn shortest_steps(&self) -> Vec<Step> {
         vec![]
+    }
+
+    pub fn all_shortest_route_paths_map(&self) -> HashMap<(Station, Station), RoutePath> {
+        let all_shortest_route_paths = self.all_shortest_route_paths();
+
+        HashMap::from_iter(zip(
+            all_shortest_route_paths
+                .iter()
+                .map(|r| r.station_pair.clone()),
+            all_shortest_route_paths.iter().map(|r| r.clone()),
+        ))
     }
 
     pub fn all_shortest_route_paths(&self) -> Vec<RoutePath> {
