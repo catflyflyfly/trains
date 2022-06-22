@@ -16,15 +16,15 @@ pub struct Network {
 }
 
 impl Network {
-    pub fn shortest_schedules_time(&self) -> u32 {
-        self.shortest_schedules()
+    pub fn shortest_time(&self) -> u32 {
+        self.shortest_steps()
             .iter()
             .map(|schedule| schedule.end_at())
             .max()
             .unwrap_or(0)
     }
 
-    pub fn shortest_schedules(&self) -> Vec<Schedule> {
+    pub fn shortest_steps(&self) -> Vec<Step> {
         vec![]
     }
 
@@ -296,7 +296,7 @@ impl TryFrom<(&[Station], &[Route])> for RoutePath {
 }
 
 #[derive(Debug, Clone)]
-pub struct Schedule {
+pub struct Step {
     pub begin_at: u32,
     pub train: Train,
     pub route: Route,
@@ -305,7 +305,7 @@ pub struct Schedule {
     pub dropped_packages: Vec<Package>,
 }
 
-impl Schedule {
+impl Step {
     fn end_at(&self) -> u32 {
         self.begin_at + self.route.duration_mins
     }
@@ -344,6 +344,6 @@ pub mod test {
         });
         println!("route count: {:#?}", len);
 
-        assert_eq!(network.shortest_schedules_time(), 30);
+        assert_eq!(network.shortest_time(), 30);
     }
 }
