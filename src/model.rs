@@ -5,7 +5,7 @@ use std::ops::Deref;
 use anyhow::{anyhow, bail, Error, Result};
 use itertools::zip;
 use itertools::Itertools;
-use pathfinding::directed::dijkstra::{build_path, dijkstra_all};
+use pathfinding::prelude::{build_path, dijkstra, dijkstra_all};
 
 use crate::args;
 
@@ -19,11 +19,7 @@ pub struct Network {
 
 impl Network {
     pub fn shortest_time(&self) -> u32 {
-        self.shortest_steps()
-            .iter()
-            .map(|schedule| schedule.end_at())
-            .max()
-            .unwrap_or(0)
+        self.solve().1
     }
 
     pub fn shortest_steps(&self) -> Vec<Step> {
@@ -107,6 +103,15 @@ impl Network {
             .iter()
             .flat_map(|package| package.actions())
             .collect::<HashSet<_>>()
+    }
+
+    fn solve(&self) -> (Vec<state::Network>, u32) {
+        dijkstra(
+            &state::Network::new(self),
+            |state| state.successor_states(),
+            |state| state.is_success(),
+        )
+        .unwrap()
     }
 }
 
@@ -379,19 +384,38 @@ pub mod state {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Clone, PartialEq, Eq)]
     pub struct Network {
         pub train_states: Vec<Train>,
-        pub possible_actions: HashSet<Action>,
-        pub optimal_route_paths_map: HashMap<(Station, Station), RoutePath>,
+        possible_actions: HashSet<Action>,
+        optimal_route_paths_map: HashMap<(Station, Station), RoutePath>,
     }
 
     impl Network {
+        pub(super) fn new(network: &super::Network) -> Self {
+            state::Network {
+                train_states: network
+                    .trains
+                    .iter()
+                    .map(|train| Train {
+                        train: train.clone(),
+                        taken_actions: vec![],
+                    })
+                    .collect_vec(),
+                possible_actions: network.possible_actions(),
+                optimal_route_paths_map: network.all_shortest_route_paths_map(),
+            }
+        }
+
         pub(super) fn successor_states(&self) -> Vec<(state::Network, u32)> {
             self.available_actions()
                 .iter()
                 .flat_map(|action| self.action_successor_states(action))
                 .collect_vec()
+        }
+
+        pub(super) fn is_success(&self) -> bool {
+            self.available_actions().is_empty()
         }
 
         fn action_successor_states(&self, action: &state::Action) -> Vec<(state::Network, u32)> {
@@ -417,14 +441,10 @@ pub mod state {
                 .map(|new_state| {
                     (
                         new_state.clone(),
-                        self.optimal_duration_mins() - current_total_durations,
+                        new_state.optimal_duration_mins() - current_total_durations,
                     )
                 })
                 .collect_vec()
-        }
-
-        pub(super) fn is_success(&self) -> bool {
-            self.available_actions().is_empty()
         }
 
         fn available_actions(&self) -> Vec<state::Action> {
@@ -457,6 +477,14 @@ pub mod state {
                 .map(|state| state.optimal_duration_mins(&self.optimal_route_paths_map))
                 .max()
                 .unwrap()
+        }
+    }
+
+    impl std::fmt::Debug for Network {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("Network")
+                .field("train_states", &self.train_states)
+                .finish()
         }
     }
 
@@ -569,19 +597,11 @@ pub mod test {
 
         let network = Network::try_from(args).unwrap();
 
-        let routes = network.all_shortest_route_paths();
-        let len = routes.len();
+        let (a, b) = network.solve();
 
-        routes.iter().for_each(|route| {
-            println!(
-                "From: {} \t To: {} \t Durations: {}",
-                route.station_pair.0.name,
-                route.station_pair.1.name,
-                route.total_duration_mins()
-            )
-        });
-        println!("route count: {:#?}", len);
+        println!("{:#?}", a.last());
+        println!("{:#?}", b);
 
-        assert_eq!(network.shortest_time(), 30);
+        assert_eq!(b, 30);
     }
 }
