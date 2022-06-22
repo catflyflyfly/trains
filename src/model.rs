@@ -230,7 +230,7 @@ impl TryFrom<(args::Package, &[Station])> for Package {
 #[derive(Debug, Clone)]
 pub struct Train {
     pub name: String,
-    pub cap: u32,
+    pub capacity: u32,
     pub initial_station: Station,
 }
 
@@ -240,7 +240,7 @@ impl TryFrom<(args::Train, &[Station])> for Train {
     fn try_from((train, stations): (args::Train, &[Station])) -> Result<Self, Self::Error> {
         let args::Train {
             name,
-            cap,
+            capacity,
             initial_station_name,
         } = train;
 
@@ -248,7 +248,7 @@ impl TryFrom<(args::Train, &[Station])> for Train {
 
         Ok(Self {
             name,
-            cap,
+            capacity,
             initial_station,
         })
     }

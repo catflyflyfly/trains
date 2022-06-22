@@ -38,7 +38,7 @@ pub struct Package {
 #[derive(Debug, Clone)]
 pub struct Train {
     pub name: String,
-    pub cap: u32,
+    pub capacity: u32,
     pub initial_station_name: String,
 }
 
@@ -97,7 +97,7 @@ pub mod parser {
         if let [name, capacity, initial_station_name] = input.split(",").collect_vec()[..] {
             Ok(Train {
                 name: name.to_string(),
-                cap: capacity.parse().map_err(|error| {
+                capacity: capacity.parse().map_err(|error| {
                     anyhow!("parse capacity `{capacity}` fail with error `{error}`")
                 })?,
                 initial_station_name: initial_station_name.to_string(),
@@ -160,7 +160,7 @@ pub mod case {
             }],
             trains: vec![Train {
                 name: "T".into(),
-                cap: 5,
+                capacity: 5,
                 initial_station_name: "B".into(),
             }],
         }
