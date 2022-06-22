@@ -107,3 +107,62 @@ pub mod parser {
         }
     }
 }
+
+#[cfg(test)]
+pub mod case {
+    use super::*;
+
+    //   10   10   10
+    // A----B----C----E
+    //      |         |
+    //      -----D-----
+    //        20   20
+    pub fn simple_choice() -> Network {
+        Network {
+            stations: vec![
+                Station { name: "A".into() },
+                Station { name: "B".into() },
+                Station { name: "C".into() },
+                Station { name: "D".into() },
+                Station { name: "E".into() },
+            ],
+            routes: vec![
+                Route {
+                    name: "AB".into(),
+                    station_pair_name: ("A".into(), "B".into()),
+                    duration_mins: 10,
+                },
+                Route {
+                    name: "BC".into(),
+                    station_pair_name: ("B".into(), "C".into()),
+                    duration_mins: 10,
+                },
+                Route {
+                    name: "BD".into(),
+                    station_pair_name: ("B".into(), "D".into()),
+                    duration_mins: 20,
+                },
+                Route {
+                    name: "CE".into(),
+                    station_pair_name: ("C".into(), "E".into()),
+                    duration_mins: 10,
+                },
+                Route {
+                    name: "DE".into(),
+                    station_pair_name: ("D".into(), "E".into()),
+                    duration_mins: 20,
+                },
+            ],
+            packages: vec![Package {
+                name: "P".into(),
+                weight: 5,
+                station_pair_name: ("B".into(), "E".into()),
+            }],
+            trains: vec![Train {
+                name: "T".into(),
+                cap: 5,
+                initial_station_name: "B".into(),
+            }],
+        }
+    }
+}

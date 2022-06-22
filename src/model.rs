@@ -240,3 +240,19 @@ fn find_station(stations: &[Station], station_name: String) -> Result<Station> {
         .ok_or_else(|| anyhow!("station not found: {station_name}"))?
         .clone())
 }
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+
+    use crate::args::case;
+
+    #[test]
+    fn simple_choice() {
+        let args = case::simple_choice();
+
+        let network = Network::try_from(args).unwrap();
+
+        assert_eq!(network.shortest_schedules_time(), 30);
+    }
+}
