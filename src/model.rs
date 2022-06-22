@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::ops::Deref;
 
 use anyhow::{anyhow, bail, Error, Result};
@@ -99,6 +100,13 @@ impl Network {
         let duration_mins = involved_routes.into_iter().map(|route| route.duration_mins);
 
         zip(available_stations, duration_mins).collect_vec()
+    }
+
+    fn possible_actions(&self) -> HashSet<state::Action> {
+        self.packages
+            .iter()
+            .flat_map(|package| package.actions())
+            .collect::<HashSet<_>>()
     }
 }
 
@@ -217,11 +225,11 @@ pub struct Package {
 }
 
 impl Package {
-    fn from(&self) -> &Station {
+    pub fn from(&self) -> &Station {
         &self.station_pair.0
     }
 
-    fn to(&self) -> &Station {
+    pub fn to(&self) -> &Station {
         &self.station_pair.1
     }
 
@@ -371,28 +379,90 @@ pub mod state {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct Network {
         pub train_states: Vec<Train>,
+        pub possible_actions: HashSet<Action>,
+        pub optimal_route_paths_map: HashMap<(Station, Station), RoutePath>,
     }
 
     impl Network {
-        pub(super) fn taken_actions(&self) -> HashSet<Action> {
+        pub(super) fn successor_states(&self) -> Vec<(state::Network, u32)> {
+            self.available_actions()
+                .iter()
+                .flat_map(|action| self.action_successor_states(action))
+                .collect_vec()
+        }
+
+        fn action_successor_states(&self, action: &state::Action) -> Vec<(state::Network, u32)> {
+            let current_total_durations = self.optimal_duration_mins();
+
+            self.clone()
+                .train_states
+                .iter_mut()
+                .enumerate()
+                .map(|(index, train_state)| {
+                    let mut new_train_states = self.train_states.clone();
+
+                    train_state.take_action(action);
+
+                    new_train_states[index] = train_state.clone();
+
+                    new_train_states
+                })
+                .map(|train_states| state::Network {
+                    train_states,
+                    ..self.clone()
+                })
+                .map(|new_state| {
+                    (
+                        new_state.clone(),
+                        self.optimal_duration_mins() - current_total_durations,
+                    )
+                })
+                .collect_vec()
+        }
+
+        pub(super) fn is_success(&self) -> bool {
+            self.available_actions().is_empty()
+        }
+
+        fn available_actions(&self) -> Vec<state::Action> {
+            self.possible_actions
+                .difference(&self.taken_actions())
+                .group_by(|action| action.package())
+                .into_iter()
+                .map(|(_, actions)| {
+                    actions
+                        .sorted()
+                        .collect_vec()
+                        .first()
+                        .unwrap()
+                        .clone()
+                        .clone()
+                })
+                .collect_vec()
+        }
+
+        fn taken_actions(&self) -> HashSet<Action> {
             self.train_states
                 .iter()
                 .flat_map(|state| state.taken_actions.clone())
                 .collect()
         }
 
-        pub(super) fn optimal_duration_mins(
-            &self,
-            optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
-        ) -> u32 {
+        fn optimal_duration_mins(&self) -> u32 {
             self.train_states
                 .iter()
-                .map(|state| state.optimal_duration_mins(optimal_route_paths_map))
+                .map(|state| state.optimal_duration_mins(&self.optimal_route_paths_map))
                 .max()
                 .unwrap()
+        }
+    }
+
+    impl std::hash::Hash for Network {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            self.train_states.hash(state);
         }
     }
 
