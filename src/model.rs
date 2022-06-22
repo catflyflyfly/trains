@@ -15,6 +15,18 @@ pub struct Network {
 }
 
 impl Network {
+    pub fn shortest_schedules_time(&self) -> u32 {
+        self.shortest_schedules()
+            .iter()
+            .map(|schedule| schedule.end_at())
+            .max()
+            .unwrap_or(0)
+    }
+
+    pub fn shortest_schedules(&self) -> Vec<Schedule> {
+        vec![]
+    }
+
     pub fn print_all_shortest_routes(&self) {
         let all = self
             .stations
@@ -202,6 +214,22 @@ impl TryFrom<(args::Train, &[Station])> for Train {
             cap,
             initial_station,
         })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Schedule {
+    pub begin_at: u32,
+    pub train: Train,
+    pub route: Route,
+    pub destination: Station,
+    pub picked_packages: Vec<Package>,
+    pub dropped_packages: Vec<Package>,
+}
+
+impl Schedule {
+    fn end_at(&self) -> u32 {
+        self.begin_at + self.route.duration_mins
     }
 }
 
