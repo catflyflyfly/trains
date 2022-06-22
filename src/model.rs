@@ -1,9 +1,9 @@
-use std::collections::HashMap;
 use std::ops::Deref;
 
 use anyhow::{anyhow, bail, Error, Result};
 use itertools::zip;
 use itertools::Itertools;
+use pathfinding::directed::dijkstra::{build_path, dijkstra_all};
 
 use crate::args;
 
@@ -54,39 +54,11 @@ impl Network {
     }
 
     fn shortest_route_paths(&self, from: &Station) -> Vec<RoutePath> {
-        fn shortest_station_seq(
-            from: &Station,
-            to: &Station,
-            reachable_by: &HashMap<Station, (Station, u32)>,
-        ) -> Vec<Station> {
-            let mut stations: Vec<Station> = vec![to.clone()];
-            let mut to = to;
-
-            loop {
-                let prev_station = &reachable_by
-                    .get(to)
-                    .ok_or_else(|| format!("{}", to.name))
-                    .unwrap()
-                    .0;
-
-                stations.push(prev_station.clone());
-
-                if stations.last().unwrap() == from {
-                    break;
-                }
-
-                to = prev_station
-            }
-
-            stations
-        }
-
-        let reachable_stations =
-            pathfinding::prelude::dijkstra_all(from, |to| self.reachable_stations(to));
+        let reachable_stations = dijkstra_all(from, |to| self.reachable_stations(to));
 
         reachable_stations
             .keys()
-            .map(|to| shortest_station_seq(from, to, &reachable_stations))
+            .map(|to| build_path(to, &reachable_stations))
             .map(|station_seq| {
                 RoutePath::try_from((station_seq.deref(), self.routes.deref())).unwrap()
             })
