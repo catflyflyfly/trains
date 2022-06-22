@@ -256,7 +256,7 @@ impl TryFrom<(args::Package, &[Station])> for Package {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Train {
     pub name: String,
     pub capacity: u32,
@@ -326,6 +326,9 @@ impl TryFrom<(&[Station], &[Route])> for RoutePath {
 
 pub mod state {
     use std::cmp::Ordering;
+    use std::collections::HashSet;
+
+    use itertools::Either;
 
     use super::*;
 
@@ -365,6 +368,97 @@ pub mod state {
                 Action::Pick(_, s) => s.clone(),
                 Action::Drop(_, s) => s.clone(),
             }
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub struct Network {
+        pub train_states: Vec<Train>,
+    }
+
+    impl Network {
+        pub(super) fn taken_actions(&self) -> HashSet<Action> {
+            self.train_states
+                .iter()
+                .flat_map(|state| state.taken_actions.clone())
+                .collect()
+        }
+
+        pub(super) fn optimal_duration_mins(
+            &self,
+            optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
+        ) -> u32 {
+            self.train_states
+                .iter()
+                .map(|state| state.optimal_duration_mins(optimal_route_paths_map))
+                .max()
+                .unwrap()
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub struct Train {
+        pub train: super::Train,
+        pub taken_actions: Vec<Action>,
+    }
+
+    impl Train {
+        fn take_action(&mut self, action: &Action) {
+            self.taken_actions.push(action.clone())
+        }
+
+        fn current_packages(&self) -> HashSet<Package> {
+            let (picked_packages, dropped_packages): (HashSet<_>, HashSet<_>) =
+                self.taken_actions.iter().partition_map(|r| match r {
+                    Action::Pick(p, _) => Either::Left(p),
+                    Action::Drop(p, _) => Either::Right(p),
+                });
+
+            picked_packages
+                .difference(&dropped_packages)
+                .map(|package| package.clone().clone())
+                .collect()
+        }
+
+        fn optimal_duration_mins(
+            &self,
+            optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
+        ) -> u32 {
+            self.optimal_route_paths(optimal_route_paths_map)
+                .iter()
+                .map(|state| state.total_duration_mins())
+                .sum()
+        }
+
+        fn optimal_route_paths(
+            &self,
+            optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
+        ) -> Vec<RoutePath> {
+            if self.taken_actions.is_empty() {
+                return vec![];
+            }
+
+            let froms = vec![
+                vec![self.train.initial_station.clone()],
+                self.taken_actions
+                    .iter()
+                    .take(self.taken_actions.len() - 1)
+                    .map(|a| a.station())
+                    .collect_vec(),
+            ]
+            .concat();
+
+            let tos = self
+                .taken_actions
+                .iter()
+                .take(self.taken_actions.len())
+                .map(|a| a.station());
+
+            let pairs = zip(froms, tos);
+
+            pairs
+                .map(|pair| optimal_route_paths_map.get(&pair).unwrap().clone())
+                .collect_vec()
         }
     }
 }
