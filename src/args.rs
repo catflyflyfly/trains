@@ -161,7 +161,7 @@ pub mod case {
             trains: vec![Train {
                 name: "T".into(),
                 capacity: 5,
-                initial_station_name: "B".into(),
+                initial_station_name: "A".into(),
             }],
         }
     }
