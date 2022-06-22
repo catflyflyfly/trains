@@ -209,11 +209,28 @@ impl TryFrom<(args::Route, &[Station])> for Route {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Package {
     pub name: String,
     pub weight: u32,
     pub station_pair: (Station, Station),
+}
+
+impl Package {
+    fn from(&self) -> &Station {
+        &self.station_pair.0
+    }
+
+    fn to(&self) -> &Station {
+        &self.station_pair.1
+    }
+
+    fn actions(&self) -> Vec<state::Action> {
+        vec![
+            state::Action::Pick(self.clone(), self.from().clone()),
+            state::Action::Drop(self.clone(), self.to().clone()),
+        ]
+    }
 }
 
 impl TryFrom<(args::Package, &[Station])> for Package {
@@ -304,6 +321,51 @@ impl TryFrom<(&[Station], &[Route])> for RoutePath {
             station_pair: (first.clone(), last.clone()),
             routes,
         })
+    }
+}
+
+pub mod state {
+    use std::cmp::Ordering;
+
+    use super::*;
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub enum Action {
+        Pick(Package, Station),
+        Drop(Package, Station),
+    }
+
+    impl PartialOrd for Action {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    impl Ord for Action {
+        fn cmp(&self, other: &Self) -> Ordering {
+            match (self, other) {
+                (Action::Pick(_, _), Action::Pick(_, _))
+                | (Action::Drop(_, _), Action::Drop(_, _)) => Ordering::Equal,
+                (Action::Pick(_, _), Action::Drop(_, _)) => Ordering::Less,
+                (Action::Drop(_, _), Action::Pick(_, _)) => Ordering::Greater,
+            }
+        }
+    }
+
+    impl Action {
+        pub(super) fn package(&self) -> Package {
+            match self {
+                Action::Pick(p, _) => p.clone(),
+                Action::Drop(p, _) => p.clone(),
+            }
+        }
+
+        pub(super) fn station(&self) -> Station {
+            match self {
+                Action::Pick(_, s) => s.clone(),
+                Action::Drop(_, s) => s.clone(),
+            }
+        }
     }
 }
 
