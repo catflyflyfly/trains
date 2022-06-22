@@ -117,6 +117,10 @@ pub mod case {
     //      |         |
     //      -----D-----
     //        20   20
+    //
+    // T1, 5, A
+    // P1, 5, B -> E
+    //
     pub fn simple_choice() -> Network {
         Network {
             stations: vec![
@@ -162,6 +166,96 @@ pub mod case {
                 name: "T".into(),
                 capacity: 5,
                 initial_station_name: "A".into(),
+            }],
+        }
+    }
+
+    //   10
+    // A----B
+    //
+    //      C
+    //
+    // T1, 5, A
+    // P1, 5, A -> B
+    //
+    pub fn simple_unreachable() -> Network {
+        Network {
+            stations: vec![
+                Station { name: "A".into() },
+                Station { name: "B".into() },
+                Station { name: "C".into() },
+            ],
+            routes: vec![Route {
+                name: "AB".into(),
+                station_pair_name: ("A".into(), "B".into()),
+                duration_mins: 10,
+            }],
+            packages: vec![Package {
+                name: "P".into(),
+                weight: 5,
+                station_pair_name: ("A".into(), "B".into()),
+            }],
+            trains: vec![Train {
+                name: "T".into(),
+                capacity: 5,
+                initial_station_name: "A".into(),
+            }],
+        }
+    }
+
+    //   10   50   40   10
+    // A----B----C----D----E
+    //
+    // T1, 10, C
+    // P1, 5, B -> A
+    // P2, 5, D -> E
+    pub fn diverge() -> Network {
+        Network {
+            stations: vec![
+                Station { name: "A".into() },
+                Station { name: "B".into() },
+                Station { name: "C".into() },
+                Station { name: "D".into() },
+                Station { name: "E".into() },
+            ],
+            routes: vec![
+                Route {
+                    name: "AB".into(),
+                    station_pair_name: ("A".into(), "B".into()),
+                    duration_mins: 10,
+                },
+                Route {
+                    name: "BC".into(),
+                    station_pair_name: ("B".into(), "C".into()),
+                    duration_mins: 50,
+                },
+                Route {
+                    name: "CD".into(),
+                    station_pair_name: ("C".into(), "D".into()),
+                    duration_mins: 40,
+                },
+                Route {
+                    name: "DE".into(),
+                    station_pair_name: ("D".into(), "E".into()),
+                    duration_mins: 10,
+                },
+            ],
+            packages: vec![
+                Package {
+                    name: "P1".into(),
+                    weight: 5,
+                    station_pair_name: ("B".into(), "A".into()),
+                },
+                Package {
+                    name: "P2".into(),
+                    weight: 5,
+                    station_pair_name: ("D".into(), "E".into()),
+                },
+            ],
+            trains: vec![Train {
+                name: "T".into(),
+                capacity: 10,
+                initial_station_name: "C".into(),
             }],
         }
     }

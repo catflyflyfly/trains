@@ -262,15 +262,23 @@ pub mod test {
 
     use crate::args::case;
 
-    #[test]
-    fn simple_choice() {
-        let args = case::simple_choice();
+    macro_rules! test_solve_train_network {
+        ($case_name:ident, $expected_time:literal) => {
+            #[test]
+            fn $case_name() {
+                let args = case::$case_name();
 
-        let network = Network::try_from(args).unwrap();
+                let network = Network::try_from(args).unwrap();
 
-        println!("{:#?}", network.optimal_instructions());
-        println!("{:#?}", network.optimal_time_mins());
+                println!("{:#?}", network.optimal_instructions());
+                println!("{:#?}", network.optimal_time_mins());
 
-        assert_eq!(network.optimal_time_mins(), 30);
+                assert_eq!(network.optimal_time_mins(), $expected_time);
+            }
+        };
     }
+
+    test_solve_train_network!(simple_choice, 30);
+    test_solve_train_network!(simple_unreachable, 10);
+    test_solve_train_network!(diverge, 160);
 }
