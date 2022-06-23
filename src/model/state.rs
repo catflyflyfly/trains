@@ -46,7 +46,7 @@ impl Action {
 #[derive(Clone, PartialEq, Eq)]
 pub struct Network {
     pub train_states: Vec<Train>,
-    possible_actions: HashSet<Action>,
+    required_actions: Vec<Action>,
     optimal_route_paths_map: HashMap<(Station, Station), RoutePath>,
 }
 
@@ -61,15 +61,15 @@ impl Network {
                     taken_actions: vec![],
                 })
                 .collect_vec(),
-            possible_actions: network.possible_actions(),
+            required_actions: network.actions(),
             optimal_route_paths_map: network.all_shortest_route_paths_map(),
         }
     }
 
-    pub(super) fn successor_states(&self) -> Vec<(state::Network, u32)> {
+    pub(super) fn take_available_actions(&self) -> Vec<(state::Network, u32)> {
         self.available_actions()
             .iter()
-            .flat_map(|action| self.action_successor_states(action))
+            .flat_map(|action| self.take_action(action))
             .collect_vec()
     }
 
@@ -84,7 +84,7 @@ impl Network {
             .collect_vec()
     }
 
-    fn action_successor_states(&self, action: &state::Action) -> Vec<(state::Network, u32)> {
+    fn take_action(&self, action: &state::Action) -> Vec<(state::Network, u32)> {
         let current_total_durations = self.optimal_duration_mins();
 
         self.clone()
@@ -114,7 +114,10 @@ impl Network {
     }
 
     fn available_actions(&self) -> Vec<state::Action> {
-        self.possible_actions
+        self.required_actions
+            .iter()
+            .map(|x| x.clone())
+            .collect::<HashSet<_>>()
             .difference(&self.taken_actions())
             .group_by(|action| action.package())
             .into_iter()

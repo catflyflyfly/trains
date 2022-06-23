@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::ops::Deref;
 
 use anyhow::{anyhow, bail, Error, Result};
@@ -31,17 +30,17 @@ impl Network {
         self.solve().0.last().unwrap().instructions()
     }
 
-    fn possible_actions(&self) -> HashSet<state::Action> {
+    fn actions(&self) -> Vec<state::Action> {
         self.packages
             .iter()
             .flat_map(|package| package.actions())
-            .collect::<HashSet<_>>()
+            .collect_vec()
     }
 
     fn solve(&self) -> (Vec<state::Network>, u32) {
         dijkstra(
             &state::Network::new(self),
-            |state| state.successor_states(),
+            |state| state.take_available_actions(),
             |state| state.is_success(),
         )
         .unwrap()
