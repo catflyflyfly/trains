@@ -65,7 +65,7 @@ impl Network {
         }
     }
 
-    pub(super) fn take_available_actions(&self) -> Vec<(state::Network, u32)> {
+    pub(super) fn take_available_actions(&self) -> Vec<(Network, u32)> {
         self.available_actions()
             .iter()
             .flat_map(|action| self.take_action(action))
@@ -99,7 +99,7 @@ impl Network {
 
                 new_train_states
             })
-            .map(|train_states| state::Network {
+            .map(|train_states| Network {
                 train_states,
                 ..self.clone()
             })
@@ -112,7 +112,7 @@ impl Network {
             .collect_vec()
     }
 
-    fn available_actions(&self) -> Vec<state::Action> {
+    fn available_actions(&self) -> Vec<Action> {
         self.untaken_actions()
             .iter()
             .group_by(|action| action.package())
@@ -278,5 +278,131 @@ impl Train {
                 instructions
             })
             .collect_vec()
+    }
+}
+
+#[cfg(test)]
+pub mod case {}
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+
+    #[test]
+    fn train_take_action_diverge() {
+        let network = crate::model::case::diverge();
+
+        let mut network_state = Network::new(&network);
+
+        let possible_actions = network.actions();
+
+        let (pick_p1, drop_p1, pick_p2, drop_p2) = possible_actions.iter().collect_tuple().unwrap();
+
+        fn assert_state_eq(
+            state: &Network,
+            taken_actions: Vec<Action>,
+            untaken_actions: Vec<Action>,
+            available_actions: Vec<Action>,
+            optimal_duration_mins: u32,
+            instructions_len: usize,
+            is_success: bool,
+            train_optimal_duration_mins: u32,
+            train_instructions_len: usize,
+        ) {
+            assert_eq!(state.taken_actions(), taken_actions);
+            assert_eq!(state.untaken_actions(), untaken_actions);
+            assert_eq!(state.available_actions(), available_actions);
+            assert_eq!(state.optimal_duration_mins(), optimal_duration_mins);
+            assert_eq!(state.instructions().len(), instructions_len);
+            assert_eq!(state.is_success(), is_success);
+            assert_eq!(
+                state.train_states[0].optimal_duration_mins(&state.optimal_route_paths_map),
+                train_optimal_duration_mins
+            );
+            assert_eq!(
+                state.train_states[0]
+                    .instructions(&state.optimal_route_paths_map)
+                    .len(),
+                train_instructions_len
+            );
+        }
+
+        assert_state_eq(
+            &network_state,
+            vec![],
+            vec![
+                pick_p1.clone(),
+                drop_p1.clone(),
+                pick_p2.clone(),
+                drop_p2.clone(),
+            ],
+            vec![pick_p1.clone(), pick_p2.clone()],
+            0,
+            0,
+            false,
+            0,
+            0,
+        );
+
+        network_state.train_states[0].take_action(pick_p1);
+
+        assert_state_eq(
+            &network_state,
+            vec![pick_p1.clone()],
+            vec![drop_p1.clone(), pick_p2.clone(), drop_p2.clone()],
+            vec![drop_p1.clone(), pick_p2.clone()],
+            50,
+            1,
+            false,
+            50,
+            1,
+        );
+
+        network_state.train_states[0].take_action(drop_p1);
+
+        assert_state_eq(
+            &network_state,
+            vec![pick_p1.clone(), drop_p1.clone()],
+            vec![pick_p2.clone(), drop_p2.clone()],
+            vec![pick_p2.clone()],
+            60,
+            2,
+            false,
+            60,
+            2,
+        );
+
+        network_state.train_states[0].take_action(pick_p2);
+
+        assert_state_eq(
+            &network_state,
+            vec![pick_p1.clone(), drop_p1.clone(), pick_p2.clone()],
+            vec![drop_p2.clone()],
+            vec![drop_p2.clone()],
+            160,
+            5,
+            false,
+            160,
+            5,
+        );
+
+        network_state.train_states[0].take_action(drop_p2);
+
+        assert_state_eq(
+            &network_state,
+            vec![
+                pick_p1.clone(),
+                drop_p1.clone(),
+                pick_p2.clone(),
+                drop_p2.clone(),
+            ],
+            vec![],
+            vec![],
+            170,
+            6,
+            true,
+            170,
+            6,
+        );
     }
 }
