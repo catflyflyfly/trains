@@ -30,6 +30,12 @@ impl Network {
         self.solve().0.last().unwrap().instructions()
     }
 
+    pub fn print_optimal_instructions(&self) {
+        self.optimal_instructions()
+            .iter()
+            .for_each(|i| println!("{i}"));
+    }
+
     fn actions(&self) -> Vec<state::Action> {
         self.packages
             .iter()
@@ -253,6 +259,45 @@ fn find_station(stations: &[Station], station_name: String) -> Result<Station> {
         .find(|station| station.name == station_name)
         .ok_or_else(|| anyhow!("station not found: {station_name}"))?
         .clone())
+}
+
+impl std::fmt::Display for Instruction {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let picked_package_name = format!(
+            "[{}]",
+            self.picked_package
+                .as_ref()
+                .map(|package| package.name.clone())
+                .unwrap_or("".to_string())
+        );
+
+        let dropped_package_name = format!(
+            "[{}]",
+            self.dropped_package
+                .as_ref()
+                .map(|package| package.name.clone())
+                .unwrap_or("".to_string())
+        );
+        let val = vec![
+            ("W", self.begin_at.to_string()),
+            ("T", self.train.name.clone()),
+            ("N1", self.route.from().name.clone()),
+            ("P1", picked_package_name),
+            ("N2", self.route.to().name.clone()),
+            ("N2", dropped_package_name),
+        ];
+
+        let mut str = "";
+        for (field, value) in val {
+            fmt.write_str(str)?;
+            fmt.write_str(field)?;
+            fmt.write_str(" = ")?;
+            fmt.write_str(&value)?;
+            str = ", ";
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
