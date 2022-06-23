@@ -112,23 +112,20 @@ pub mod parser {
 pub mod case {
     use super::*;
 
-    //   10   10   10
-    // A----B----C----E
-    //      |         |
-    //      -----D-----
-    //        20   20
+    //   10   10
+    // A----B----C
     //
     // T, 5, A
-    // P, 5, B -> E
+    // P, 5, A -> C
     //
-    pub fn simple_choice() -> Network {
+    // Solution: 20     A-A(Pick)-C
+    //
+    pub fn direct() -> Network {
         Network {
             stations: vec![
                 Station { name: "A".into() },
                 Station { name: "B".into() },
                 Station { name: "C".into() },
-                Station { name: "D".into() },
-                Station { name: "E".into() },
             ],
             routes: vec![
                 Route {
@@ -141,26 +138,64 @@ pub mod case {
                     station_pair_name: ("B".into(), "C".into()),
                     duration_mins: 10,
                 },
+            ],
+            packages: vec![Package {
+                name: "P".into(),
+                weight: 5,
+                station_pair_name: ("A".into(), "C".into()),
+            }],
+            trains: vec![Train {
+                name: "T".into(),
+                capacity: 5,
+                initial_station_name: "A".into(),
+            }],
+        }
+    }
+
+    //   10   10
+    // /----B----\
+    // A         D
+    // \----C----/
+    //   10   50
+    //
+    // T, 5, A
+    // P, 5, A -> D
+    //
+    // Solution: 20     A-A(Pick)-D
+    pub fn choice() -> Network {
+        Network {
+            stations: vec![
+                Station { name: "A".into() },
+                Station { name: "B".into() },
+                Station { name: "C".into() },
+                Station { name: "D".into() },
+            ],
+            routes: vec![
                 Route {
-                    name: "BD".into(),
-                    station_pair_name: ("B".into(), "D".into()),
-                    duration_mins: 20,
-                },
-                Route {
-                    name: "CE".into(),
-                    station_pair_name: ("C".into(), "E".into()),
+                    name: "AB".into(),
+                    station_pair_name: ("A".into(), "B".into()),
                     duration_mins: 10,
                 },
                 Route {
-                    name: "DE".into(),
-                    station_pair_name: ("D".into(), "E".into()),
-                    duration_mins: 20,
+                    name: "AC".into(),
+                    station_pair_name: ("A".into(), "C".into()),
+                    duration_mins: 10,
+                },
+                Route {
+                    name: "BD".into(),
+                    station_pair_name: ("B".into(), "D".into()),
+                    duration_mins: 10,
+                },
+                Route {
+                    name: "CD".into(),
+                    station_pair_name: ("C".into(), "D".into()),
+                    duration_mins: 50,
                 },
             ],
             packages: vec![Package {
                 name: "P".into(),
                 weight: 5,
-                station_pair_name: ("B".into(), "E".into()),
+                station_pair_name: ("A".into(), "D".into()),
             }],
             trains: vec![Train {
                 name: "T".into(),
@@ -171,14 +206,14 @@ pub mod case {
     }
 
     //   10
-    // A----B
-    //
-    //      C
+    // A----B    C
     //
     // T, 5, A
     // P, 5, A -> B
     //
-    pub fn simple_unreachable() -> Network {
+    // Solution: 10     A-A(Pick)-B
+    //
+    pub fn islands() -> Network {
         Network {
             stations: vec![
                 Station { name: "A".into() },
@@ -209,6 +244,9 @@ pub mod case {
     // T, 10, C
     // P1, 5, B -> A
     // P2, 5, D -> E
+    //
+    // Solution: 160    C-D-E-B-A
+    //
     pub fn diverge() -> Network {
         Network {
             stations: vec![
@@ -268,6 +306,7 @@ pub mod case {
     // P2, 5, A -> B
     //
     // Solution: 30     A-A(Pick)-B-A-B
+    //
     pub fn multiple_packages_small_train() -> Network {
         Network {
             stations: vec![Station { name: "A".into() }, Station { name: "B".into() }],
@@ -291,6 +330,43 @@ pub mod case {
             trains: vec![Train {
                 name: "T".into(),
                 capacity: 5,
+                initial_station_name: "A".into(),
+            }],
+        }
+    }
+
+    //   10
+    // A----B
+    //
+    // T, 10, A
+    // P1, 5, A -> B
+    // P2, 5, A -> B
+    //
+    // Solution: 10     A-A(Pick)-B
+    //
+    pub fn multiple_packages_big_train() -> Network {
+        Network {
+            stations: vec![Station { name: "A".into() }, Station { name: "B".into() }],
+            routes: vec![Route {
+                name: "AB".into(),
+                station_pair_name: ("A".into(), "B".into()),
+                duration_mins: 10,
+            }],
+            packages: vec![
+                Package {
+                    name: "P1".into(),
+                    weight: 5,
+                    station_pair_name: ("A".into(), "B".into()),
+                },
+                Package {
+                    name: "P2".into(),
+                    weight: 5,
+                    station_pair_name: ("A".into(), "B".into()),
+                },
+            ],
+            trains: vec![Train {
+                name: "T".into(),
+                capacity: 10,
                 initial_station_name: "A".into(),
             }],
         }

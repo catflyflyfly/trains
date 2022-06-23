@@ -342,8 +342,6 @@ pub mod case {
         };
     }
 
-    from_model!(simple_choice);
-    from_model!(simple_unreachable);
     from_model!(diverge);
     from_model!(multiple_packages_small_train);
 }

@@ -268,10 +268,12 @@ pub mod case {
         };
     }
 
-    from_args!(simple_choice);
-    from_args!(simple_unreachable);
+    from_args!(direct);
+    from_args!(choice);
+    from_args!(islands);
     from_args!(diverge);
     from_args!(multiple_packages_small_train);
+    from_args!(multiple_packages_big_train);
 }
 
 #[cfg(test)]
@@ -292,8 +294,10 @@ pub mod test {
         };
     }
 
-    test_solve_train_network!(simple_choice, 30);
-    test_solve_train_network!(simple_unreachable, 10);
+    test_solve_train_network!(direct, 20);
+    test_solve_train_network!(choice, 20);
+    test_solve_train_network!(islands, 10);
     test_solve_train_network!(diverge, 160);
     test_solve_train_network!(multiple_packages_small_train, 30);
+    test_solve_train_network!(multiple_packages_big_train, 10);
 }
