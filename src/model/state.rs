@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 
+use itertools::Either;
+
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -177,7 +179,46 @@ pub struct Train {
 
 impl Train {
     fn take_action(&mut self, action: &Action) {
+        // TODO: implement conditional result here
+        let _ = self.can_take(action);
+
         self.taken_actions.push(action.clone())
+    }
+
+    fn can_take(&self, action: &Action) -> bool {
+        match action {
+            Action::Pick(package, _) => self.can_pick(package),
+            Action::Drop(package, _) => self.can_drop(package),
+        }
+    }
+
+    fn can_pick(&self, package: &Package) -> bool {
+        package.weight + self.current_weight() <= self.train.capacity
+    }
+
+    fn can_drop(&self, _package: &Package) -> bool {
+        true // TODO
+    }
+
+    fn current_weight(&self) -> u32 {
+        self.current_packages()
+            .iter()
+            .map(|package| package.weight)
+            .sum()
+    }
+
+    fn current_packages(&self) -> Vec<Package> {
+        let (picked_packages, dropped_packages): (Vec<_>, Vec<_>) =
+            self.taken_actions.iter().partition_map(|r| match r {
+                Action::Pick(p, _) => Either::Left(p),
+                Action::Drop(p, _) => Either::Right(p),
+            });
+
+        picked_packages
+            .iter()
+            .filter(|package| !dropped_packages.contains(package))
+            .map(|package| package.clone().clone())
+            .collect()
     }
 
     fn optimal_duration_mins(
@@ -320,6 +361,7 @@ pub mod test {
             optimal_duration_mins: u32,
             instructions_len: usize,
             is_success: bool,
+            train_current_weight: u32,
             train_optimal_duration_mins: u32,
             train_instructions_len: usize,
         ) {
@@ -329,6 +371,7 @@ pub mod test {
             assert_eq!(state.optimal_duration_mins(), optimal_duration_mins);
             assert_eq!(state.instructions().len(), instructions_len);
             assert_eq!(state.is_success(), is_success);
+            assert_eq!(state.train_states[0].current_weight(), train_current_weight);
             assert_eq!(
                 state.train_states[0].optimal_duration_mins(&state.optimal_route_paths_map),
                 train_optimal_duration_mins
@@ -356,6 +399,7 @@ pub mod test {
             false,
             0,
             0,
+            0,
         );
 
         state.train_states[0].take_action(pick_p1);
@@ -368,6 +412,7 @@ pub mod test {
             50,
             1,
             false,
+            5,
             50,
             1,
         );
@@ -382,6 +427,7 @@ pub mod test {
             60,
             2,
             false,
+            0,
             60,
             2,
         );
@@ -396,6 +442,7 @@ pub mod test {
             160,
             5,
             false,
+            5,
             160,
             5,
         );
@@ -415,6 +462,7 @@ pub mod test {
             170,
             6,
             true,
+            0,
             170,
             6,
         );
