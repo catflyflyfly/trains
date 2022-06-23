@@ -271,6 +271,7 @@ pub mod case {
     from_args!(simple_choice);
     from_args!(simple_unreachable);
     from_args!(diverge);
+    from_args!(chain);
 }
 
 #[cfg(test)]
@@ -294,4 +295,5 @@ pub mod test {
     test_solve_train_network!(simple_choice, 30);
     test_solve_train_network!(simple_unreachable, 10);
     test_solve_train_network!(diverge, 160);
+    test_solve_train_network!(chain, 80);
 }

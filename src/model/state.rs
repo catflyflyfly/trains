@@ -297,6 +297,7 @@ pub mod case {
     from_model!(simple_choice);
     from_model!(simple_unreachable);
     from_model!(diverge);
+    from_model!(chain);
 }
 
 #[cfg(test)]
