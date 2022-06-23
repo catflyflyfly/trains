@@ -36,7 +36,7 @@ impl TryFrom<(&[Station], &[Route])> for RoutePath {
             .map(|(from, to)| {
                 all_routes
                     .iter()
-                    .find(|route| route.is_involve_station(from) && route.is_involve_station(to))
+                    .find(|route| route.is_from(from) && route.is_to(to))
                     .unwrap()
                     .clone()
             })
@@ -68,7 +68,7 @@ impl Network {
             .map(|station| RoutePath {
                 station_pair: (station.clone(), station.clone()),
                 routes: vec![Route {
-                    name: format!("iden#{}", station.name),
+                    name: format!("{}#id", station.name),
                     station_pair: (station.clone(), station.clone()),
                     duration_mins: 0,
                 }],
