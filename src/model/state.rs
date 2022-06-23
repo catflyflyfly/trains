@@ -67,13 +67,6 @@ impl Network {
         }
     }
 
-    pub(super) fn take_available_actions(&self) -> Vec<(Network, u32)> {
-        self.available_actions()
-            .iter()
-            .flat_map(|action| self.take_action(action))
-            .collect_vec()
-    }
-
     pub(super) fn is_success(&self) -> bool {
         self.available_actions().is_empty()
     }
@@ -85,49 +78,53 @@ impl Network {
             .collect_vec()
     }
 
-    fn take_action(&self, action: &state::Action) -> Vec<(state::Network, u32)> {
+    pub(super) fn take_available_actions(&self) -> Vec<(Network, u32)> {
+        let untaken_actions = self.untaken_actions();
         let current_total_durations = self.optimal_duration_mins();
 
         self.clone()
             .train_states
             .iter_mut()
             .enumerate()
-            .map(|(index, train_state)| {
-                let mut new_train_states = self.train_states.clone();
+            .flat_map(|(index, each_train_state)| {
+                let actions = each_train_state.available_actions(&untaken_actions);
 
-                train_state.take_action(action);
+                actions
+                    .iter()
+                    .map(|action| {
+                        let mut new_train_states = self.train_states.clone();
 
-                new_train_states[index] = train_state.clone();
+                        let mut new_train_state = each_train_state.clone();
 
-                new_train_states
-            })
-            .map(|train_states| Network {
-                train_states,
-                ..self.clone()
-            })
-            .map(|new_state| {
-                (
-                    new_state.clone(),
-                    new_state.optimal_duration_mins() - current_total_durations,
-                )
+                        new_train_state.take_action(action);
+
+                        new_train_states[index] = new_train_state;
+
+                        new_train_states
+                    })
+                    .map(|train_states| Network {
+                        train_states,
+                        ..self.clone()
+                    })
+                    .map(|new_state| {
+                        (
+                            new_state.clone(),
+                            new_state.optimal_duration_mins() - current_total_durations,
+                        )
+                    })
+                    .collect_vec()
             })
             .collect_vec()
     }
 
     fn available_actions(&self) -> Vec<Action> {
-        self.untaken_actions()
+        let untaken_actions = self.untaken_actions();
+
+        self.train_states
             .iter()
-            .group_by(|action| action.package())
-            .into_iter()
-            .map(|(_, actions)| {
-                actions
-                    .sorted()
-                    .collect_vec()
-                    .first()
-                    .unwrap()
-                    .clone()
-                    .clone()
-            })
+            .flat_map(|train| train.available_actions(&untaken_actions))
+            .cloned()
+            .unique()
             .collect_vec()
     }
 
@@ -179,10 +176,14 @@ pub struct Train {
 
 impl Train {
     fn take_action(&mut self, action: &Action) {
-        // TODO: implement conditional result here
-        let _ = self.can_take(action);
+        self.taken_actions.push(action.clone());
+    }
 
-        self.taken_actions.push(action.clone())
+    fn available_actions<'a>(&'a self, actions: &'a [Action]) -> Vec<&Action> {
+        actions
+            .into_iter()
+            .filter(|action| self.can_take(action))
+            .collect_vec()
     }
 
     fn can_take(&self, action: &Action) -> bool {
@@ -196,8 +197,14 @@ impl Train {
         package.weight + self.current_weight() <= self.train.capacity
     }
 
-    fn can_drop(&self, _package: &Package) -> bool {
-        true // TODO
+    fn can_drop(&self, package: &Package) -> bool {
+        self.taken_actions
+            .iter()
+            .find(|action| match action {
+                Action::Pick(_, _) => action.package() == package.clone(),
+                Action::Drop(_, _) => false,
+            })
+            .is_some()
     }
 
     fn current_weight(&self) -> u32 {
@@ -338,7 +345,7 @@ pub mod case {
     from_model!(simple_choice);
     from_model!(simple_unreachable);
     from_model!(diverge);
-    from_model!(chain);
+    from_model!(multiple_packages_small_train);
 }
 
 #[cfg(test)]
@@ -352,37 +359,6 @@ pub mod test {
         let possible_actions = &state.required_actions;
 
         let (pick_p1, drop_p1, pick_p2, drop_p2) = possible_actions.iter().collect_tuple().unwrap();
-
-        fn assert_state_eq(
-            state: &Network,
-            taken_actions: Vec<Action>,
-            untaken_actions: Vec<Action>,
-            available_actions: Vec<Action>,
-            optimal_duration_mins: u32,
-            instructions_len: usize,
-            is_success: bool,
-            train_current_weight: u32,
-            train_optimal_duration_mins: u32,
-            train_instructions_len: usize,
-        ) {
-            assert_eq!(state.taken_actions(), taken_actions);
-            assert_eq!(state.untaken_actions(), untaken_actions);
-            assert_eq!(state.available_actions(), available_actions);
-            assert_eq!(state.optimal_duration_mins(), optimal_duration_mins);
-            assert_eq!(state.instructions().len(), instructions_len);
-            assert_eq!(state.is_success(), is_success);
-            assert_eq!(state.train_states[0].current_weight(), train_current_weight);
-            assert_eq!(
-                state.train_states[0].optimal_duration_mins(&state.optimal_route_paths_map),
-                train_optimal_duration_mins
-            );
-            assert_eq!(
-                state.train_states[0]
-                    .instructions(&state.optimal_route_paths_map)
-                    .len(),
-                train_instructions_len
-            );
-        }
 
         assert_state_eq(
             &state,
@@ -469,14 +445,95 @@ pub mod test {
     }
 
     #[test]
-    fn network_take_action_diverge() {
-        let state = case::diverge();
+    fn train_take_action_multiple_packages_small_train() {
+        let mut state = case::multiple_packages_small_train();
 
         let possible_actions = &state.required_actions;
 
-        let (pick_p1, _, _, _) = possible_actions.iter().collect_tuple().unwrap();
+        let (pick_p1, drop_p1, pick_p2, drop_p2) = possible_actions.iter().collect_tuple().unwrap();
 
-        assert_eq!(state.take_action(pick_p1).len(), 1)
+        assert_state_eq(
+            &state,
+            vec![],
+            vec![
+                pick_p1.clone(),
+                drop_p1.clone(),
+                pick_p2.clone(),
+                drop_p2.clone(),
+            ],
+            vec![pick_p1.clone(), pick_p2.clone()],
+            0,
+            0,
+            false,
+            0,
+            0,
+            0,
+        );
+
+        state.train_states[0].take_action(pick_p1);
+
+        assert_state_eq(
+            &state,
+            vec![pick_p1.clone()],
+            vec![drop_p1.clone(), pick_p2.clone(), drop_p2.clone()],
+            vec![drop_p1.clone()],
+            0,
+            1,
+            false,
+            5,
+            0,
+            1,
+        );
+
+        state.train_states[0].take_action(drop_p1);
+
+        assert_state_eq(
+            &state,
+            vec![pick_p1.clone(), drop_p1.clone()],
+            vec![pick_p2.clone(), drop_p2.clone()],
+            vec![pick_p2.clone()],
+            10,
+            2,
+            false,
+            0,
+            10,
+            2,
+        );
+
+        state.train_states[0].take_action(pick_p2);
+
+        assert_state_eq(
+            &state,
+            vec![pick_p1.clone(), drop_p1.clone(), pick_p2.clone()],
+            vec![drop_p2.clone()],
+            vec![drop_p2.clone()],
+            20,
+            3,
+            false,
+            5,
+            20,
+            3,
+        );
+
+        state.train_states[0].take_action(drop_p2);
+
+        assert_state_eq(
+            &state,
+            vec![
+                pick_p1.clone(),
+                drop_p1.clone(),
+                pick_p2.clone(),
+                drop_p2.clone(),
+            ],
+            vec![],
+            vec![],
+            30,
+            4,
+            true,
+            0,
+            30,
+            4,
+        );
     }
 
     #[test]
@@ -505,5 +562,36 @@ pub mod test {
         let state = &state1.0;
         let successor_states = state.take_available_actions();
         assert_eq!(successor_states.len(), 0);
+    }
+
+    fn assert_state_eq(
+        state: &Network,
+        taken_actions: Vec<Action>,
+        untaken_actions: Vec<Action>,
+        available_actions: Vec<Action>,
+        optimal_duration_mins: u32,
+        instructions_len: usize,
+        is_success: bool,
+        train_current_weight: u32,
+        train_optimal_duration_mins: u32,
+        train_instructions_len: usize,
+    ) {
+        assert_eq!(state.taken_actions(), taken_actions);
+        assert_eq!(state.untaken_actions(), untaken_actions);
+        assert_eq!(state.available_actions(), available_actions);
+        assert_eq!(state.optimal_duration_mins(), optimal_duration_mins);
+        assert_eq!(state.instructions().len(), instructions_len);
+        assert_eq!(state.is_success(), is_success);
+        assert_eq!(state.train_states[0].current_weight(), train_current_weight);
+        assert_eq!(
+            state.train_states[0].optimal_duration_mins(&state.optimal_route_paths_map),
+            train_optimal_duration_mins
+        );
+        assert_eq!(
+            state.train_states[0]
+                .instructions(&state.optimal_route_paths_map)
+                .len(),
+            train_instructions_len
+        );
     }
 }
