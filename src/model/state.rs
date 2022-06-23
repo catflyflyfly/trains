@@ -44,7 +44,7 @@ impl Action {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Eq)]
 pub struct Network {
     pub train_states: Vec<Train>,
     required_actions: Vec<Action>,
@@ -141,7 +141,7 @@ impl Network {
         self.required_actions
             .iter()
             .filter(|action| !taken_actions.contains(action))
-            .map(|action| action.clone())
+            .cloned()
             .collect_vec()
     }
 
@@ -159,6 +159,12 @@ impl std::fmt::Debug for Network {
         f.debug_struct("Network")
             .field("train_states", &self.train_states)
             .finish()
+    }
+}
+
+impl PartialEq for Network {
+    fn eq(&self, other: &Self) -> bool {
+        self.train_states == other.train_states
     }
 }
 
@@ -181,7 +187,7 @@ impl Train {
 
     fn available_actions<'a>(&'a self, actions: &'a [Action]) -> Vec<&Action> {
         actions
-            .into_iter()
+            .iter()
             .filter(|action| self.can_take(action))
             .collect_vec()
     }
@@ -198,13 +204,10 @@ impl Train {
     }
 
     fn can_drop(&self, package: &Package) -> bool {
-        self.taken_actions
-            .iter()
-            .find(|action| match action {
-                Action::Pick(_, _) => action.package() == package.clone(),
-                Action::Drop(_, _) => false,
-            })
-            .is_some()
+        self.taken_actions.iter().any(|action| match action {
+            Action::Pick(_, _) => action.package() == package.clone(),
+            Action::Drop(_, _) => false,
+        })
     }
 
     fn current_weight(&self) -> u32 {
@@ -222,9 +225,9 @@ impl Train {
             });
 
         picked_packages
-            .iter()
+            .into_iter()
             .filter(|package| !dropped_packages.contains(package))
-            .map(|package| package.clone().clone())
+            .cloned()
             .collect()
     }
 
@@ -295,8 +298,8 @@ impl Train {
 
                 let _ = match (is_last(index), action) {
                     (false, _) => &builder,
-                    (true, Action::Pick(p, _)) => &builder.picked_package(p.clone()),
-                    (true, Action::Drop(p, _)) => &builder.dropped_package(p.clone()),
+                    (true, Action::Pick(p, _)) => builder.picked_package(p.clone()),
+                    (true, Action::Drop(p, _)) => builder.dropped_package(p.clone()),
                 };
 
                 let instruction = builder.build().unwrap();
@@ -319,7 +322,7 @@ impl Train {
 
         zip(route_paths, taken_actions)
             .flat_map(|(route_path, action)| {
-                let instructions = self.sub_instructions(&route_path, &action, begin_at);
+                let instructions = self.sub_instructions(&route_path, action, begin_at);
 
                 begin_at += route_path.total_duration_mins();
 

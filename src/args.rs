@@ -49,7 +49,7 @@ pub mod parser {
     use crate::args::{Package, Route, Station, Train};
 
     pub fn parse_station(input: &str) -> Result<Station> {
-        if let [name] = input.split(",").collect_vec()[..] {
+        if let [name] = input.split(',').collect_vec()[..] {
             Ok(Station {
                 name: name.to_string(),
             })
@@ -60,7 +60,7 @@ pub mod parser {
 
     pub fn parse_route(input: &str) -> Result<Route> {
         if let [name, station1_name, station2_name, duration_mins] =
-            input.split(",").collect_vec()[..]
+            input.split(',').collect_vec()[..]
         {
             Ok(Route {
                 name: name.to_string(),
@@ -76,7 +76,7 @@ pub mod parser {
 
     pub fn parse_package(input: &str) -> Result<Package> {
         if let [name, weight, start_station_name, destination_station_name] =
-            input.split(",").collect_vec()[..]
+            input.split(',').collect_vec()[..]
         {
             Ok(Package {
                 name: name.to_string(),
@@ -94,7 +94,7 @@ pub mod parser {
     }
 
     pub fn parse_train(input: &str) -> Result<Train> {
-        if let [name, capacity, initial_station_name] = input.split(",").collect_vec()[..] {
+        if let [name, capacity, initial_station_name] = input.split(',').collect_vec()[..] {
             Ok(Train {
                 name: name.to_string(),
                 capacity: capacity.parse().map_err(|error| {

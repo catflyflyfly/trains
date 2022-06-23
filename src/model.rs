@@ -124,13 +124,13 @@ impl Route {
     fn is_involve_station(&self, station: &Station) -> bool {
         let (from, to) = &self.station_pair;
 
-        return from == station || to == station;
+        from == station || to == station
     }
 
     fn corresponding_station(&self, station: &Station) -> Result<&Station> {
         match &self.station_pair {
-            (from, to) if from == station => Ok(&to),
-            (from, to) if to == station => Ok(&from),
+            (from, to) if from == station => Ok(to),
+            (from, to) if to == station => Ok(from),
             _ => bail!(
                 "this station {} is not the part of this route",
                 station.name

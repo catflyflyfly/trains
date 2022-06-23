@@ -57,7 +57,7 @@ impl Network {
             all_shortest_route_paths
                 .iter()
                 .map(|r| r.station_pair.clone()),
-            all_shortest_route_paths.iter().map(|r| r.clone()),
+            all_shortest_route_paths.iter().cloned(),
         ))
     }
 
@@ -78,8 +78,7 @@ impl Network {
         let out_route_paths = self
             .stations
             .iter()
-            .map(|station| self.shortest_route_paths(station))
-            .flatten()
+            .flat_map(|station| self.shortest_route_paths(station))
             .unique()
             .collect_vec();
 
