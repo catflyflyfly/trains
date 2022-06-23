@@ -305,9 +305,9 @@ pub mod test {
 
     #[test]
     fn train_take_action_diverge() {
-        let mut network_state = case::diverge();
+        let mut state = case::diverge();
 
-        let possible_actions = &network_state.required_actions;
+        let possible_actions = &state.required_actions;
 
         let (pick_p1, drop_p1, pick_p2, drop_p2) = possible_actions.iter().collect_tuple().unwrap();
 
@@ -341,7 +341,7 @@ pub mod test {
         }
 
         assert_state_eq(
-            &network_state,
+            &state,
             vec![],
             vec![
                 pick_p1.clone(),
@@ -357,10 +357,10 @@ pub mod test {
             0,
         );
 
-        network_state.train_states[0].take_action(pick_p1);
+        state.train_states[0].take_action(pick_p1);
 
         assert_state_eq(
-            &network_state,
+            &state,
             vec![pick_p1.clone()],
             vec![drop_p1.clone(), pick_p2.clone(), drop_p2.clone()],
             vec![drop_p1.clone(), pick_p2.clone()],
@@ -371,10 +371,10 @@ pub mod test {
             1,
         );
 
-        network_state.train_states[0].take_action(drop_p1);
+        state.train_states[0].take_action(drop_p1);
 
         assert_state_eq(
-            &network_state,
+            &state,
             vec![pick_p1.clone(), drop_p1.clone()],
             vec![pick_p2.clone(), drop_p2.clone()],
             vec![pick_p2.clone()],
@@ -385,10 +385,10 @@ pub mod test {
             2,
         );
 
-        network_state.train_states[0].take_action(pick_p2);
+        state.train_states[0].take_action(pick_p2);
 
         assert_state_eq(
-            &network_state,
+            &state,
             vec![pick_p1.clone(), drop_p1.clone(), pick_p2.clone()],
             vec![drop_p2.clone()],
             vec![drop_p2.clone()],
@@ -399,10 +399,10 @@ pub mod test {
             5,
         );
 
-        network_state.train_states[0].take_action(drop_p2);
+        state.train_states[0].take_action(drop_p2);
 
         assert_state_eq(
-            &network_state,
+            &state,
             vec![
                 pick_p1.clone(),
                 drop_p1.clone(),
@@ -417,5 +417,44 @@ pub mod test {
             170,
             6,
         );
+    }
+
+    #[test]
+    fn network_take_action_diverge() {
+        let state = case::diverge();
+
+        let possible_actions = &state.required_actions;
+
+        let (pick_p1, _, _, _) = possible_actions.iter().collect_tuple().unwrap();
+
+        assert_eq!(state.take_action(pick_p1).len(), 1)
+    }
+
+    #[test]
+    fn network_take_available_actions_diverge() {
+        let state = case::diverge();
+
+        let successor_states = state.take_available_actions();
+        assert_eq!(successor_states.len(), 2);
+        let (state1, _) = successor_states.iter().collect_tuple().unwrap();
+
+        let state = &state1.0;
+        let successor_states = state.take_available_actions();
+        assert_eq!(successor_states.len(), 2);
+        let (state1, _) = successor_states.iter().collect_tuple().unwrap();
+
+        let state = &state1.0;
+        let successor_states = state.take_available_actions();
+        assert_eq!(successor_states.len(), 1);
+        let (state1,) = successor_states.iter().collect_tuple().unwrap();
+
+        let state = &state1.0;
+        let successor_states = state.take_available_actions();
+        assert_eq!(successor_states.len(), 1);
+        let (state1,) = successor_states.iter().collect_tuple().unwrap();
+
+        let state = &state1.0;
+        let successor_states = state.take_available_actions();
+        assert_eq!(successor_states.len(), 0);
     }
 }
