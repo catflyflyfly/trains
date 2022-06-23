@@ -282,7 +282,22 @@ impl Train {
 }
 
 #[cfg(test)]
-pub mod case {}
+pub mod case {
+    use super::*;
+    use crate::model;
+
+    macro_rules! from_model {
+        ($case_name:ident) => {
+            pub fn $case_name() -> Network {
+                Network::new(&model::case::$case_name())
+            }
+        };
+    }
+
+    from_model!(simple_choice);
+    from_model!(simple_unreachable);
+    from_model!(diverge);
+}
 
 #[cfg(test)]
 pub mod test {
@@ -290,11 +305,9 @@ pub mod test {
 
     #[test]
     fn train_take_action_diverge() {
-        let network = crate::model::case::diverge();
+        let mut network_state = case::diverge();
 
-        let mut network_state = Network::new(&network);
-
-        let possible_actions = network.actions();
+        let possible_actions = &network_state.required_actions;
 
         let (pick_p1, drop_p1, pick_p2, drop_p2) = possible_actions.iter().collect_tuple().unwrap();
 
