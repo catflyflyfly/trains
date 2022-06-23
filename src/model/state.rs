@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::collections::HashSet;
 
 use super::*;
 
@@ -114,11 +113,8 @@ impl Network {
     }
 
     fn available_actions(&self) -> Vec<state::Action> {
-        self.required_actions
+        self.untaken_actions()
             .iter()
-            .map(|x| x.clone())
-            .collect::<HashSet<_>>()
-            .difference(&self.taken_actions())
             .group_by(|action| action.package())
             .into_iter()
             .map(|(_, actions)| {
@@ -133,11 +129,21 @@ impl Network {
             .collect_vec()
     }
 
-    fn taken_actions(&self) -> HashSet<Action> {
+    fn taken_actions(&self) -> Vec<Action> {
         self.train_states
             .iter()
             .flat_map(|state| state.taken_actions.clone())
             .collect()
+    }
+
+    fn untaken_actions(&self) -> Vec<Action> {
+        let taken_actions = self.taken_actions();
+
+        self.required_actions
+            .iter()
+            .filter(|action| !taken_actions.contains(action))
+            .map(|action| action.clone())
+            .collect_vec()
     }
 
     fn optimal_duration_mins(&self) -> u32 {
