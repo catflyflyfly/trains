@@ -284,7 +284,7 @@ impl std::fmt::Display for Instruction {
             self.picked_package
                 .as_ref()
                 .map(|package| package.name.clone())
-                .unwrap_or("".to_string())
+                .unwrap_or_else(|| "".to_string())
         );
 
         let dropped_package_name = format!(
@@ -292,7 +292,7 @@ impl std::fmt::Display for Instruction {
             self.dropped_package
                 .as_ref()
                 .map(|package| package.name.clone())
-                .unwrap_or("".to_string())
+                .unwrap_or_else(|| "".to_string())
         );
         let val = vec![
             ("W", self.begin_at.to_string()),
