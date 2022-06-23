@@ -28,6 +28,22 @@ pub struct Route {
     pub duration_mins: u32,
 }
 
+impl Route {
+    pub fn reverse(&self) -> Self {
+        let Self {
+            name,
+            station_pair_name: (from, to),
+            duration_mins,
+        } = self.clone();
+
+        Self {
+            name,
+            station_pair_name: (to, from),
+            duration_mins,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Package {
     pub name: String,

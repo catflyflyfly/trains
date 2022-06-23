@@ -59,11 +59,19 @@ impl TryFrom<args::Network> for Network {
     fn try_from(input: args::Network) -> Result<Self, Self::Error> {
         let stations = input.stations.into_iter().map(Station::from).collect_vec();
 
+        let reversed_routes = input
+            .routes
+            .iter()
+            .map(|route| Route::try_from((route.reverse(), stations.deref())))
+            .collect::<Result<Vec<_>>>()?;
+
         let routes = input
             .routes
             .into_iter()
             .map(|route| Route::try_from((route, stations.deref())))
             .collect::<Result<Vec<_>>>()?;
+
+        let routes = vec![reversed_routes, routes].concat();
 
         let packages = input
             .packages
@@ -125,6 +133,14 @@ impl Route {
 
     pub fn to(&self) -> &Station {
         &self.station_pair.1
+    }
+
+    pub fn is_from(&self, station: &Station) -> bool {
+        self.from().name == station.name
+    }
+
+    pub fn is_to(&self, station: &Station) -> bool {
+        self.to().name == station.name
     }
 
     fn is_involve_station(&self, station: &Station) -> bool {
