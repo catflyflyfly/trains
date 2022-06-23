@@ -257,18 +257,32 @@ fn find_station(stations: &[Station], station_name: String) -> Result<Station> {
 }
 
 #[cfg(test)]
+pub mod case {
+    use super::*;
+    use crate::args;
+
+    macro_rules! from_args {
+        ($case_name:ident) => {
+            pub fn $case_name() -> Network {
+                Network::try_from(args::case::$case_name()).unwrap()
+            }
+        };
+    }
+
+    from_args!(simple_choice);
+    from_args!(simple_unreachable);
+    from_args!(diverge);
+}
+
+#[cfg(test)]
 pub mod test {
     use super::*;
-
-    use crate::args::case;
 
     macro_rules! test_solve_train_network {
         ($case_name:ident, $expected_time:literal) => {
             #[test]
             fn $case_name() {
-                let args = case::$case_name();
-
-                let network = Network::try_from(args).unwrap();
+                let network = case::$case_name();
 
                 println!("{:#?}", network.optimal_instructions());
                 println!("{:#?}", network.optimal_time_mins());
