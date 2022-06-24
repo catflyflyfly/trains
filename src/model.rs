@@ -1,7 +1,7 @@
 use std::hash::Hash;
 use std::ops::Deref;
 
-use anyhow::{anyhow, bail, Error, Result};
+use anyhow::{anyhow, Error, Result};
 use itertools::zip;
 use itertools::Itertools;
 use pathfinding::prelude::dijkstra;
@@ -109,7 +109,7 @@ impl From<args::Station> for Station {
 pub struct Route {
     pub name: String,
     pub station_pair: (Station, Station),
-    pub duration_mins: u32,
+    pub travel_time: u32,
 }
 
 impl PartialEq for Route {
@@ -142,23 +142,6 @@ impl Route {
     pub fn is_to(&self, station: &Station) -> bool {
         self.to().name == station.name
     }
-
-    fn is_involve_station(&self, station: &Station) -> bool {
-        let (from, to) = &self.station_pair;
-
-        from == station || to == station
-    }
-
-    fn corresponding_station(&self, station: &Station) -> Result<&Station> {
-        match &self.station_pair {
-            (from, to) if from == station => Ok(to),
-            (from, to) if to == station => Ok(from),
-            _ => bail!(
-                "this station {} is not the part of this route",
-                station.name
-            ),
-        }
-    }
 }
 
 impl TryFrom<(args::Route, &[Station])> for Route {
@@ -168,7 +151,7 @@ impl TryFrom<(args::Route, &[Station])> for Route {
         let args::Route {
             name,
             station_pair_name: (from_name, to_name),
-            duration_mins,
+            travel_time,
         } = route;
 
         let station_pair = (
@@ -179,7 +162,7 @@ impl TryFrom<(args::Route, &[Station])> for Route {
         Ok(Self {
             name,
             station_pair,
-            duration_mins,
+            travel_time,
         })
     }
 }

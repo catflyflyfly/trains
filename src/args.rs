@@ -25,7 +25,7 @@ pub struct Station {
 pub struct Route {
     pub name: String,
     pub station_pair_name: (String, String),
-    pub duration_mins: u32,
+    pub travel_time: u32,
 }
 
 impl Route {
@@ -33,13 +33,13 @@ impl Route {
         let Self {
             name,
             station_pair_name: (from, to),
-            duration_mins,
+            travel_time,
         } = self.clone();
 
         Self {
             name,
             station_pair_name: (to, from),
-            duration_mins,
+            travel_time,
         }
     }
 }
@@ -75,18 +75,18 @@ pub mod parser {
     }
 
     pub fn parse_route(input: &str) -> Result<Route> {
-        if let [name, station1_name, station2_name, duration_mins] =
+        if let [name, station1_name, station2_name, travel_time] =
             input.split(',').collect_vec()[..]
         {
             Ok(Route {
                 name: name.to_string(),
                 station_pair_name: (station1_name.to_string(), station2_name.to_string()),
-                duration_mins: duration_mins.parse().map_err(|error| {
-                    anyhow!("parse duration_mins `{duration_mins}` fail with error `{error}`")
+                travel_time: travel_time.parse().map_err(|error| {
+                    anyhow!("parse travel_time `{travel_time}` fail with error `{error}`")
                 })?,
             })
         } else {
-            bail!("[NAME],[STATION1],[STATION2],[DURATION_MINS]")
+            bail!("[NAME],[STATION1],[STATION2],[TRAVEL_TIME]")
         }
     }
 
@@ -147,12 +147,12 @@ pub mod case {
                 Route {
                     name: "AB".into(),
                     station_pair_name: ("A".into(), "B".into()),
-                    duration_mins: 10,
+                    travel_time: 10,
                 },
                 Route {
                     name: "BC".into(),
                     station_pair_name: ("B".into(), "C".into()),
-                    duration_mins: 10,
+                    travel_time: 10,
                 },
             ],
             packages: vec![Package {
@@ -190,22 +190,22 @@ pub mod case {
                 Route {
                     name: "AB".into(),
                     station_pair_name: ("A".into(), "B".into()),
-                    duration_mins: 10,
+                    travel_time: 10,
                 },
                 Route {
                     name: "AC".into(),
                     station_pair_name: ("A".into(), "C".into()),
-                    duration_mins: 10,
+                    travel_time: 10,
                 },
                 Route {
                     name: "BD".into(),
                     station_pair_name: ("B".into(), "D".into()),
-                    duration_mins: 10,
+                    travel_time: 10,
                 },
                 Route {
                     name: "CD".into(),
                     station_pair_name: ("C".into(), "D".into()),
-                    duration_mins: 50,
+                    travel_time: 50,
                 },
             ],
             packages: vec![Package {
@@ -239,7 +239,7 @@ pub mod case {
             routes: vec![Route {
                 name: "AB".into(),
                 station_pair_name: ("A".into(), "B".into()),
-                duration_mins: 10,
+                travel_time: 10,
             }],
             packages: vec![Package {
                 name: "P".into(),
@@ -276,22 +276,22 @@ pub mod case {
                 Route {
                     name: "AB".into(),
                     station_pair_name: ("A".into(), "B".into()),
-                    duration_mins: 10,
+                    travel_time: 10,
                 },
                 Route {
                     name: "BC".into(),
                     station_pair_name: ("B".into(), "C".into()),
-                    duration_mins: 50,
+                    travel_time: 50,
                 },
                 Route {
                     name: "CD".into(),
                     station_pair_name: ("C".into(), "D".into()),
-                    duration_mins: 40,
+                    travel_time: 40,
                 },
                 Route {
                     name: "DE".into(),
                     station_pair_name: ("D".into(), "E".into()),
-                    duration_mins: 10,
+                    travel_time: 10,
                 },
             ],
             packages: vec![
@@ -329,7 +329,7 @@ pub mod case {
             routes: vec![Route {
                 name: "AB".into(),
                 station_pair_name: ("A".into(), "B".into()),
-                duration_mins: 10,
+                travel_time: 10,
             }],
             packages: vec![
                 Package {
@@ -366,7 +366,7 @@ pub mod case {
             routes: vec![Route {
                 name: "AB".into(),
                 station_pair_name: ("A".into(), "B".into()),
-                duration_mins: 10,
+                travel_time: 10,
             }],
             packages: vec![
                 Package {
@@ -413,12 +413,12 @@ pub mod case {
                 Route {
                     name: "AB1".into(),
                     station_pair_name: ("A1".into(), "B1".into()),
-                    duration_mins: 10,
+                    travel_time: 10,
                 },
                 Route {
                     name: "AB2".into(),
                     station_pair_name: ("A2".into(), "B2".into()),
-                    duration_mins: 20,
+                    travel_time: 20,
                 },
             ],
             packages: vec![

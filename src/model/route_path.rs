@@ -15,8 +15,8 @@ pub struct RoutePath {
 }
 
 impl RoutePath {
-    pub fn total_duration_mins(&self) -> u32 {
-        self.routes.iter().map(|route| route.duration_mins).sum()
+    pub fn travel_time(&self) -> u32 {
+        self.routes.iter().map(|route| route.travel_time).sum()
     }
 }
 
@@ -72,7 +72,7 @@ impl Network {
                 routes: vec![Route {
                     name: format!("{}#id", station.name),
                     station_pair: (station.clone(), station.clone()),
-                    duration_mins: 0,
+                    travel_time: 0,
                 }],
             })
             .collect_vec();
@@ -102,24 +102,21 @@ impl Network {
     fn routes_from(&self, station: &Station) -> Vec<&Route> {
         self.routes
             .iter()
-            .filter(|route| route.is_involve_station(station))
+            .filter(|route| route.is_from(station))
             .collect_vec()
     }
 
     fn reachable_stations(&self, station: &Station) -> Vec<(Station, u32)> {
-        let involved_routes = self.routes_from(station);
+        let outward_routes = self.routes_from(station);
 
-        let available_stations = involved_routes
+        let available_stations = outward_routes
             .iter()
-            .map(|route| route.corresponding_station(station))
-            .collect::<Result<Vec<_>>>()
-            .unwrap()
-            .into_iter()
-            .map(|st| st.to_owned())
+            .map(|route| route.to())
+            .cloned()
             .collect_vec();
 
-        let duration_mins = involved_routes.into_iter().map(|route| route.duration_mins);
+        let travel_time = outward_routes.into_iter().map(|route| route.travel_time);
 
-        zip(available_stations, duration_mins).collect_vec()
+        zip(available_stations, travel_time).collect_vec()
     }
 }
