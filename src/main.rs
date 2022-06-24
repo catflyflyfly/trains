@@ -8,12 +8,9 @@ pub mod args;
 pub mod model;
 
 fn main() -> Result<()> {
-    let network_args = args::Network::parse();
-
-    let network = model::Network::try_from(network_args)?;
-
-    network.print_optimal_instructions();
-    println!("{:#?}", network.optimal_time_mins());
+    model::Network::try_from(args::Network::parse())?
+        .optimal_itinerary()
+        .print_output();
 
     Ok(())
 }

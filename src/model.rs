@@ -22,20 +22,6 @@ pub struct Network {
 }
 
 impl Network {
-    pub fn optimal_time_mins(&self) -> u32 {
-        self.solve().1
-    }
-
-    pub fn optimal_instructions(&self) -> Vec<Instruction> {
-        self.solve().0.last().unwrap().instructions()
-    }
-
-    pub fn print_optimal_instructions(&self) {
-        self.optimal_instructions()
-            .iter()
-            .for_each(|i| println!("{i}"));
-    }
-
     fn actions(&self) -> Vec<state::Action> {
         self.packages
             .iter()
@@ -43,13 +29,17 @@ impl Network {
             .collect_vec()
     }
 
-    fn solve(&self) -> (Vec<state::Network>, u32) {
+    pub fn optimal_itinerary<'a>(&'a self) -> state::Network<'a> {
         dijkstra(
             &state::Network::new(self),
             |state| state.take_available_actions(),
             |state| state.is_success(),
         )
         .unwrap()
+        .0
+        .last()
+        .unwrap()
+        .clone()
     }
 }
 
@@ -325,10 +315,7 @@ pub mod test {
             fn $case_name() {
                 let network = case::$case_name();
 
-                println!("{:#?}", network.optimal_instructions());
-                println!("{:#?}", network.optimal_time_mins());
-
-                assert_eq!(network.optimal_time_mins(), $expected_time);
+                assert_eq!(network.optimal_state().travel_time_used(), $expected_time);
             }
         };
     }

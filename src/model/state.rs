@@ -37,7 +37,7 @@ pub struct Network<'a> {
 
 impl<'a> Network<'a> {
     pub(super) fn new(network: &'a super::Network) -> Self {
-        let route_map = Rc::new(network.all_shortest_route_paths_map());
+        let route_map = Rc::new(network.route_map());
 
         Self {
             train_states: network
@@ -55,13 +55,6 @@ impl<'a> Network<'a> {
 
     pub(super) fn is_success(&self) -> bool {
         self.available_actions().is_empty()
-    }
-
-    pub(super) fn instructions(&self) -> Vec<Instruction> {
-        self.train_states
-            .iter()
-            .flat_map(|state| state.instructions())
-            .collect_vec()
     }
 
     pub(super) fn take_available_actions(&self) -> Vec<(Network<'a>, u32)> {
@@ -131,12 +124,30 @@ impl<'a> Network<'a> {
             .collect_vec()
     }
 
-    fn travel_time_used(&self) -> u32 {
+    pub fn instructions(&self) -> Vec<Instruction> {
+        self.train_states
+            .iter()
+            .flat_map(|state| state.instructions())
+            .collect_vec()
+    }
+
+    pub fn travel_time_used(&self) -> u32 {
         self.train_states
             .iter()
             .map(|state| state.travel_time_used())
             .max()
             .unwrap()
+    }
+
+    pub fn print_output(&self) {
+        self.print_instructions();
+        println!("Total time used: {}", self.travel_time_used())
+    }
+
+    fn print_instructions(&self) {
+        self.instructions()
+            .iter()
+            .for_each(|instruction| println!("{instruction}"));
     }
 }
 

@@ -52,8 +52,8 @@ impl TryFrom<(&[Station], &[Route])> for RoutePath {
 pub type RouteMap = HashMap<(Station, Station), RoutePath>;
 
 impl Network {
-    pub fn all_shortest_route_paths_map(&self) -> RouteMap {
-        let all_shortest_route_paths = self.all_shortest_route_paths();
+    pub fn route_map(&self) -> RouteMap {
+        let all_shortest_route_paths = self.shortest_route_paths();
 
         HashMap::from_iter(zip(
             all_shortest_route_paths
@@ -63,7 +63,7 @@ impl Network {
         ))
     }
 
-    fn all_shortest_route_paths(&self) -> Vec<RoutePath> {
+    fn shortest_route_paths(&self) -> Vec<RoutePath> {
         let self_route_paths = self
             .stations
             .iter()
@@ -80,14 +80,14 @@ impl Network {
         let out_route_paths = self
             .stations
             .iter()
-            .flat_map(|station| self.shortest_route_paths(station))
+            .flat_map(|station| self.shortest_route_paths_from(station))
             .unique()
             .collect_vec();
 
         vec![self_route_paths, out_route_paths].concat()
     }
 
-    fn shortest_route_paths(&self, from: &Station) -> Vec<RoutePath> {
+    fn shortest_route_paths_from(&self, from: &Station) -> Vec<RoutePath> {
         let reachable_stations = dijkstra_all(from, |to| self.reachable_stations(to));
 
         reachable_stations
