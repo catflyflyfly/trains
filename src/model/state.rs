@@ -57,7 +57,7 @@ impl<'a> Network<'a> {
         self.available_actions().is_empty()
     }
 
-    pub fn instructions(&self) -> Vec<Instruction> {
+    pub(super) fn instructions(&self) -> Vec<Instruction> {
         self.train_states
             .iter()
             .flat_map(|state| state.instructions())
