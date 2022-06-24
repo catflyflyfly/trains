@@ -37,7 +37,7 @@ pub struct Network<'a> {
 
 impl<'a> Network<'a> {
     pub(super) fn new(network: &'a super::Network) -> Self {
-        let route_map = Rc::new(network.all_shortest_route_paths_map());
+        let route_map = Rc::new(network.route_map());
 
         Self {
             train_states: network
@@ -57,30 +57,22 @@ impl<'a> Network<'a> {
         self.available_actions().is_empty()
     }
 
-    pub(super) fn instructions(&self) -> Vec<Instruction> {
-        self.train_states
-            .iter()
-            .flat_map(|state| state.instructions())
-            .collect_vec()
-    }
-
     pub(super) fn take_available_actions(&self) -> Vec<(Network<'a>, u32)> {
         let untaken_actions = self.untaken_actions();
-        let current_total_durations = self.optimal_duration_mins();
+        let travel_time_used = self.travel_time_used();
 
         self.clone()
             .train_states
             .iter_mut()
             .enumerate()
-            .flat_map(|(index, each_train_state)| {
-                let actions = each_train_state.available_actions(&untaken_actions);
-
-                actions
+            .flat_map(|(index, train_state)| {
+                train_state
+                    .available_actions(&untaken_actions)
                     .iter()
                     .map(|action| {
                         let mut new_train_states = self.train_states.clone();
 
-                        let mut new_train_state = each_train_state.clone();
+                        let mut new_train_state = train_state.clone();
 
                         new_train_state.take_action(action);
 
@@ -95,7 +87,7 @@ impl<'a> Network<'a> {
                     .map(|new_state| {
                         (
                             new_state.clone(),
-                            new_state.optimal_duration_mins() - current_total_durations,
+                            new_state.travel_time_used() - travel_time_used,
                         )
                     })
                     .collect_vec()
@@ -131,12 +123,30 @@ impl<'a> Network<'a> {
             .collect_vec()
     }
 
-    fn optimal_duration_mins(&self) -> u32 {
+    pub fn instructions(&self) -> Vec<Instruction> {
         self.train_states
             .iter()
-            .map(|state| state.optimal_duration_mins())
+            .flat_map(|state| state.instructions())
+            .collect_vec()
+    }
+
+    pub fn travel_time_used(&self) -> u32 {
+        self.train_states
+            .iter()
+            .map(|state| state.travel_time_used())
             .max()
             .unwrap()
+    }
+
+    pub fn print_output(&self) {
+        self.print_instructions();
+        println!("Total time used: {}", self.travel_time_used())
+    }
+
+    fn print_instructions(&self) {
+        self.instructions()
+            .iter()
+            .for_each(|instruction| println!("{instruction}"));
     }
 }
 
@@ -182,7 +192,9 @@ impl<'a> Hash for Train<'a> {
 
 impl<'a> Train<'a> {
     fn take_action(&mut self, action: &Action) {
-        self.taken_actions.push(action.clone());
+        if self.can_take(action) {
+            self.taken_actions.push(action.clone())
+        }
     }
 
     fn available_actions<'b>(&'b self, actions: &'b [Action]) -> Vec<&Action> {
@@ -238,14 +250,14 @@ impl<'a> Train<'a> {
             .collect()
     }
 
-    fn optimal_duration_mins(&self) -> u32 {
-        self.optimal_route_paths()
+    fn travel_time_used(&self) -> u32 {
+        self.route_paths()
             .iter()
-            .map(|state| state.total_duration_mins())
+            .map(|state| state.travel_time())
             .sum()
     }
 
-    fn optimal_route_paths(&self) -> Vec<RoutePath> {
+    fn route_paths(&self) -> Vec<RoutePath> {
         if self.taken_actions.is_empty() {
             return vec![];
         }
@@ -266,11 +278,37 @@ impl<'a> Train<'a> {
             .take(self.taken_actions.len())
             .map(|a| a.station());
 
-        let pairs = zip(froms, tos);
+        let routes = zip(froms, tos);
 
-        pairs
-            .map(|pair| self.route_map.get(&pair).unwrap().clone())
+        routes
+            .map(|from_to| self.route_map.get(&from_to).unwrap().clone())
             .collect_vec()
+    }
+
+    fn instructions(&self) -> Vec<Instruction> {
+        let route_paths = self.route_paths();
+        let taken_actions = &self.taken_actions;
+
+        let mut begin_at = 0;
+
+        zip(route_paths, taken_actions)
+            .flat_map(|(route_path, action)| {
+                let instructions = self.sub_instructions(&route_path, action, begin_at);
+
+                begin_at += route_path.travel_time();
+
+                instructions
+            })
+            .fold(vec![], |mut acc, next| match acc.pop() {
+                Some(last) => {
+                    acc.extend(last.combine(next));
+                    acc
+                }
+                None => {
+                    acc.push(next);
+                    acc
+                }
+            })
     }
 
     fn sub_instructions(
@@ -285,7 +323,7 @@ impl<'a> Train<'a> {
 
         let mut begin_at = begin_at;
 
-        route_path
+        let mut instructions = route_path
             .routes
             .iter()
             .enumerate()
@@ -298,54 +336,31 @@ impl<'a> Train<'a> {
                     .route(route.clone());
 
                 let _ = match (is_last(index), action) {
-                    (false, _) => &builder,
-                    (true, Action::Pick(p, _)) => builder.picked_package(p.clone()),
-                    (true, Action::Drop(p, _)) => builder.dropped_package(p.clone()),
+                    (true, Action::Drop(p, _)) => builder.dropped_package(vec![p.clone()]),
+                    _ => &builder,
                 };
 
                 let instruction = builder.build().unwrap();
 
-                begin_at += route.duration_mins;
+                begin_at += route.travel_time;
 
                 instruction
             })
-            .collect_vec()
-    }
+            .collect_vec();
 
-    fn instructions(&self) -> Vec<Instruction> {
-        let route_paths = self.optimal_route_paths();
-        let taken_actions = &self.taken_actions;
-
-        let mut begin_at = 0;
-
-        zip(route_paths, taken_actions)
-            .flat_map(|(route_path, action)| {
-                let instructions = self.sub_instructions(&route_path, action, begin_at);
-
-                begin_at += route_path.total_duration_mins();
-
-                instructions
+        if let Action::Pick(package, station) = action {
+            instructions.push(Instruction {
+                begin_at,
+                train: self.train.clone(),
+                route: Route::identity(station),
+                picked_package: vec![package.clone()],
+                dropped_package: vec![],
             })
-            .collect_vec()
+        }
+
+        instructions
     }
 }
-
-// #[cfg(test)]
-// pub mod case {
-//     use super::*;
-//     use crate::model;
-
-//     macro_rules! from_model {
-//         ($case_name:ident) => {
-//             pub fn $case_name() -> Network {
-//                 Network::new(&model::case::$case_name())
-//             }
-//         };
-//     }
-
-//     from_model!(diverge);
-//     from_model!(multiple_packages_small_train);
-// }
 
 #[cfg(test)]
 pub mod test {
@@ -389,11 +404,11 @@ pub mod test {
             vec![drop_p1.clone(), pick_p2.clone(), drop_p2.clone()],
             vec![drop_p1.clone(), pick_p2.clone()],
             50,
-            1,
+            2,
             false,
             5,
             50,
-            1,
+            2,
         );
 
         state.train_states[0].take_action(drop_p1);
@@ -419,11 +434,11 @@ pub mod test {
             vec![drop_p2.clone()],
             vec![drop_p2.clone()],
             160,
-            5,
+            6,
             false,
             5,
             160,
-            5,
+            6,
         );
 
         state.train_states[0].take_action(drop_p2);
@@ -497,11 +512,11 @@ pub mod test {
             vec![pick_p2.clone(), drop_p2.clone()],
             vec![pick_p2.clone()],
             10,
-            2,
+            1,
             false,
             0,
             10,
-            2,
+            1,
         );
 
         state.train_states[0].take_action(pick_p2);
@@ -532,11 +547,11 @@ pub mod test {
             vec![],
             vec![],
             30,
-            4,
+            3,
             true,
             0,
             30,
-            4,
+            3,
         );
     }
 
@@ -575,24 +590,21 @@ pub mod test {
         taken_actions: Vec<Action>,
         untaken_actions: Vec<Action>,
         available_actions: Vec<Action>,
-        optimal_duration_mins: u32,
+        time_used: u32,
         instructions_len: usize,
         is_success: bool,
         train_current_weight: u32,
-        train_optimal_duration_mins: u32,
+        train_time_used: u32,
         train_instructions_len: usize,
     ) {
         assert_eq!(state.taken_actions(), taken_actions);
         assert_eq!(state.untaken_actions(), untaken_actions);
         assert_eq!(state.available_actions(), available_actions);
-        assert_eq!(state.optimal_duration_mins(), optimal_duration_mins);
+        assert_eq!(state.travel_time_used(), time_used);
         assert_eq!(state.instructions().len(), instructions_len);
         assert_eq!(state.is_success(), is_success);
         assert_eq!(state.train_states[0].current_weight(), train_current_weight);
-        assert_eq!(
-            state.train_states[0].optimal_duration_mins(),
-            train_optimal_duration_mins
-        );
+        assert_eq!(state.train_states[0].travel_time_used(), train_time_used);
         assert_eq!(
             state.train_states[0].instructions().len(),
             train_instructions_len

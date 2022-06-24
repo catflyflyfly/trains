@@ -1,7 +1,7 @@
 use std::hash::Hash;
 use std::ops::Deref;
 
-use anyhow::{anyhow, bail, Error, Result};
+use anyhow::{anyhow, Error, Result};
 use itertools::zip;
 use itertools::Itertools;
 use pathfinding::prelude::dijkstra;
@@ -22,20 +22,6 @@ pub struct Network {
 }
 
 impl Network {
-    pub fn optimal_time_mins(&self) -> u32 {
-        self.solve().1
-    }
-
-    pub fn optimal_instructions(&self) -> Vec<Instruction> {
-        self.solve().0.last().unwrap().instructions()
-    }
-
-    pub fn print_optimal_instructions(&self) {
-        self.optimal_instructions()
-            .iter()
-            .for_each(|i| println!("{i}"));
-    }
-
     fn actions(&self) -> Vec<state::Action> {
         self.packages
             .iter()
@@ -43,13 +29,17 @@ impl Network {
             .collect_vec()
     }
 
-    fn solve(&self) -> (Vec<state::Network>, u32) {
+    pub fn optimal_itinerary(&self) -> state::Network {
         dijkstra(
             &state::Network::new(self),
             |state| state.take_available_actions(),
             |state| state.is_success(),
         )
         .unwrap()
+        .0
+        .last()
+        .unwrap()
+        .clone()
     }
 }
 
@@ -108,8 +98,18 @@ impl From<args::Station> for Station {
 #[derive(Debug, Clone)]
 pub struct Route {
     pub name: String,
-    pub station_pair: (Station, Station),
-    pub duration_mins: u32,
+    pub from_to: (Station, Station),
+    pub travel_time: u32,
+}
+
+impl Route {
+    fn identity(station: &Station) -> Self {
+        Self {
+            name: format!("{}#id", station.name),
+            from_to: (station.clone(), station.clone()),
+            travel_time: 0,
+        }
+    }
 }
 
 impl PartialEq for Route {
@@ -128,11 +128,11 @@ impl Hash for Route {
 
 impl Route {
     pub fn from(&self) -> &Station {
-        &self.station_pair.0
+        &self.from_to.0
     }
 
     pub fn to(&self) -> &Station {
-        &self.station_pair.1
+        &self.from_to.1
     }
 
     pub fn is_from(&self, station: &Station) -> bool {
@@ -142,23 +142,6 @@ impl Route {
     pub fn is_to(&self, station: &Station) -> bool {
         self.to().name == station.name
     }
-
-    fn is_involve_station(&self, station: &Station) -> bool {
-        let (from, to) = &self.station_pair;
-
-        from == station || to == station
-    }
-
-    fn corresponding_station(&self, station: &Station) -> Result<&Station> {
-        match &self.station_pair {
-            (from, to) if from == station => Ok(to),
-            (from, to) if to == station => Ok(from),
-            _ => bail!(
-                "this station {} is not the part of this route",
-                station.name
-            ),
-        }
-    }
 }
 
 impl TryFrom<(args::Route, &[Station])> for Route {
@@ -167,19 +150,16 @@ impl TryFrom<(args::Route, &[Station])> for Route {
     fn try_from((route, stations): (args::Route, &[Station])) -> Result<Self, Self::Error> {
         let args::Route {
             name,
-            station_pair_name: (from_name, to_name),
-            duration_mins,
+            from_to: (from, to),
+            travel_time,
         } = route;
 
-        let station_pair = (
-            find_station(stations, from_name)?,
-            find_station(stations, to_name)?,
-        );
+        let from_to = (find_station(stations, from)?, find_station(stations, to)?);
 
         Ok(Self {
             name,
-            station_pair,
-            duration_mins,
+            from_to,
+            travel_time,
         })
     }
 }
@@ -188,16 +168,16 @@ impl TryFrom<(args::Route, &[Station])> for Route {
 pub struct Package {
     pub name: String,
     pub weight: u32,
-    pub station_pair: (Station, Station),
+    pub from_to: (Station, Station),
 }
 
 impl Package {
     pub fn from(&self) -> &Station {
-        &self.station_pair.0
+        &self.from_to.0
     }
 
     pub fn to(&self) -> &Station {
-        &self.station_pair.1
+        &self.from_to.1
     }
 
     fn actions(&self) -> Vec<state::Action> {
@@ -215,18 +195,15 @@ impl TryFrom<(args::Package, &[Station])> for Package {
         let args::Package {
             name,
             weight,
-            station_pair_name: (from_name, to_name),
+            from_to: (from, to),
         } = package;
 
-        let station_pair = (
-            find_station(stations, from_name)?,
-            find_station(stations, to_name)?,
-        );
+        let from_to = (find_station(stations, from)?, find_station(stations, to)?);
 
         Ok(Self {
             name,
             weight,
-            station_pair,
+            from_to,
         })
     }
 }
@@ -263,10 +240,42 @@ pub struct Instruction {
     pub begin_at: u32,
     pub train: Train,
     pub route: Route,
-    #[builder(setter(into, strip_option), default)]
-    pub picked_package: Option<Package>,
-    #[builder(setter(into, strip_option), default)]
-    pub dropped_package: Option<Package>,
+    #[builder(default)]
+    pub picked_package: Vec<Package>,
+    #[builder(default)]
+    pub dropped_package: Vec<Package>,
+}
+
+impl Instruction {
+    fn combine(self, other: Instruction) -> Vec<Instruction> {
+        let is_same_train = self.train == other.train;
+
+        if is_same_train
+            && other.picked_package.is_empty()
+            && self.route.to().clone() == other.route.to().clone()
+        {
+            vec![Instruction {
+                begin_at: self.begin_at,
+                train: self.train,
+                route: self.route,
+                picked_package: self.picked_package,
+                dropped_package: vec![self.dropped_package, other.dropped_package].concat(),
+            }]
+        } else if is_same_train
+            && self.dropped_package.is_empty()
+            && self.route.from().clone() == other.route.from().clone()
+        {
+            vec![Instruction {
+                begin_at: self.begin_at,
+                train: self.train,
+                route: other.route,
+                dropped_package: other.dropped_package,
+                picked_package: vec![self.picked_package, other.picked_package].concat(),
+            }]
+        } else {
+            vec![self, other]
+        }
+    }
 }
 
 fn find_station(stations: &[Station], station_name: String) -> Result<Station> {
@@ -282,17 +291,17 @@ impl std::fmt::Display for Instruction {
         let picked_package_name = format!(
             "[{}]",
             self.picked_package
-                .as_ref()
+                .iter()
                 .map(|package| package.name.clone())
-                .unwrap_or_else(|| "".to_string())
+                .join(", ")
         );
 
         let dropped_package_name = format!(
             "[{}]",
             self.dropped_package
-                .as_ref()
+                .iter()
                 .map(|package| package.name.clone())
-                .unwrap_or_else(|| "".to_string())
+                .join(", ")
         );
         let val = vec![
             ("W", self.begin_at.to_string()),
@@ -300,7 +309,7 @@ impl std::fmt::Display for Instruction {
             ("N1", self.route.from().name.clone()),
             ("P1", picked_package_name),
             ("N2", self.route.to().name.clone()),
-            ("N2", dropped_package_name),
+            ("P2", dropped_package_name),
         ];
 
         let mut str = "";
@@ -348,10 +357,10 @@ pub mod test {
             fn $case_name() {
                 let network = case::$case_name();
 
-                println!("{:#?}", network.optimal_instructions());
-                println!("{:#?}", network.optimal_time_mins());
-
-                assert_eq!(network.optimal_time_mins(), $expected_time);
+                assert_eq!(
+                    network.optimal_itinerary().travel_time_used(),
+                    $expected_time
+                );
             }
         };
     }
