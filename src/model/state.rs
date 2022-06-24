@@ -182,7 +182,9 @@ impl<'a> Hash for Train<'a> {
 
 impl<'a> Train<'a> {
     fn take_action(&mut self, action: &Action) {
-        self.taken_actions.push(action.clone());
+        if self.can_take(action) {
+            self.taken_actions.push(action.clone())
+        }
     }
 
     fn available_actions<'b>(&'b self, actions: &'b [Action]) -> Vec<&Action> {
@@ -329,23 +331,6 @@ impl<'a> Train<'a> {
             .collect_vec()
     }
 }
-
-// #[cfg(test)]
-// pub mod case {
-//     use super::*;
-//     use crate::model;
-
-//     macro_rules! from_model {
-//         ($case_name:ident) => {
-//             pub fn $case_name() -> Network {
-//                 Network::new(&model::case::$case_name())
-//             }
-//         };
-//     }
-
-//     from_model!(diverge);
-//     from_model!(multiple_packages_small_train);
-// }
 
 #[cfg(test)]
 pub mod test {
