@@ -268,10 +268,10 @@ impl<'a> Train<'a> {
             .take(self.taken_actions.len())
             .map(|a| a.station());
 
-        let pairs = zip(froms, tos);
+        let routes = zip(froms, tos);
 
-        pairs
-            .map(|pair| self.route_map.get(&pair).unwrap().clone())
+        routes
+            .map(|from_to| self.route_map.get(&from_to).unwrap().clone())
             .collect_vec()
     }
 

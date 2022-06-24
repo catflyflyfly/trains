@@ -24,7 +24,7 @@ pub struct Station {
 #[derive(Debug, Clone)]
 pub struct Route {
     pub name: String,
-    pub station_pair_name: (String, String),
+    pub from_to: (String, String),
     pub travel_time: u32,
 }
 
@@ -32,13 +32,13 @@ impl Route {
     pub fn reverse(&self) -> Self {
         let Self {
             name,
-            station_pair_name: (from, to),
+            from_to: (from, to),
             travel_time,
         } = self.clone();
 
         Self {
             name,
-            station_pair_name: (to, from),
+            from_to: (to, from),
             travel_time,
         }
     }
@@ -48,7 +48,7 @@ impl Route {
 pub struct Package {
     pub name: String,
     pub weight: u32,
-    pub station_pair_name: (String, String),
+    pub from_to: (String, String),
 }
 
 #[derive(Debug, Clone)]
@@ -80,7 +80,7 @@ pub mod parser {
         {
             Ok(Route {
                 name: name.to_string(),
-                station_pair_name: (station1_name.to_string(), station2_name.to_string()),
+                from_to: (station1_name.to_string(), station2_name.to_string()),
                 travel_time: travel_time.parse().map_err(|error| {
                     anyhow!("parse travel_time `{travel_time}` fail with error `{error}`")
                 })?,
@@ -99,7 +99,7 @@ pub mod parser {
                 weight: weight.parse().map_err(|error| {
                     anyhow!("parse weight `{weight}` fail with error `{error}`")
                 })?,
-                station_pair_name: (
+                from_to: (
                     start_station_name.to_string(),
                     destination_station_name.to_string(),
                 ),
@@ -146,19 +146,19 @@ pub mod case {
             routes: vec![
                 Route {
                     name: "AB".into(),
-                    station_pair_name: ("A".into(), "B".into()),
+                    from_to: ("A".into(), "B".into()),
                     travel_time: 10,
                 },
                 Route {
                     name: "BC".into(),
-                    station_pair_name: ("B".into(), "C".into()),
+                    from_to: ("B".into(), "C".into()),
                     travel_time: 10,
                 },
             ],
             packages: vec![Package {
                 name: "P".into(),
                 weight: 5,
-                station_pair_name: ("A".into(), "C".into()),
+                from_to: ("A".into(), "C".into()),
             }],
             trains: vec![Train {
                 name: "T".into(),
@@ -189,29 +189,29 @@ pub mod case {
             routes: vec![
                 Route {
                     name: "AB".into(),
-                    station_pair_name: ("A".into(), "B".into()),
+                    from_to: ("A".into(), "B".into()),
                     travel_time: 10,
                 },
                 Route {
                     name: "AC".into(),
-                    station_pair_name: ("A".into(), "C".into()),
+                    from_to: ("A".into(), "C".into()),
                     travel_time: 10,
                 },
                 Route {
                     name: "BD".into(),
-                    station_pair_name: ("B".into(), "D".into()),
+                    from_to: ("B".into(), "D".into()),
                     travel_time: 10,
                 },
                 Route {
                     name: "CD".into(),
-                    station_pair_name: ("C".into(), "D".into()),
+                    from_to: ("C".into(), "D".into()),
                     travel_time: 50,
                 },
             ],
             packages: vec![Package {
                 name: "P".into(),
                 weight: 5,
-                station_pair_name: ("A".into(), "D".into()),
+                from_to: ("A".into(), "D".into()),
             }],
             trains: vec![Train {
                 name: "T".into(),
@@ -238,13 +238,13 @@ pub mod case {
             ],
             routes: vec![Route {
                 name: "AB".into(),
-                station_pair_name: ("A".into(), "B".into()),
+                from_to: ("A".into(), "B".into()),
                 travel_time: 10,
             }],
             packages: vec![Package {
                 name: "P".into(),
                 weight: 5,
-                station_pair_name: ("A".into(), "B".into()),
+                from_to: ("A".into(), "B".into()),
             }],
             trains: vec![Train {
                 name: "T".into(),
@@ -275,22 +275,22 @@ pub mod case {
             routes: vec![
                 Route {
                     name: "AB".into(),
-                    station_pair_name: ("A".into(), "B".into()),
+                    from_to: ("A".into(), "B".into()),
                     travel_time: 10,
                 },
                 Route {
                     name: "BC".into(),
-                    station_pair_name: ("B".into(), "C".into()),
+                    from_to: ("B".into(), "C".into()),
                     travel_time: 50,
                 },
                 Route {
                     name: "CD".into(),
-                    station_pair_name: ("C".into(), "D".into()),
+                    from_to: ("C".into(), "D".into()),
                     travel_time: 40,
                 },
                 Route {
                     name: "DE".into(),
-                    station_pair_name: ("D".into(), "E".into()),
+                    from_to: ("D".into(), "E".into()),
                     travel_time: 10,
                 },
             ],
@@ -298,12 +298,12 @@ pub mod case {
                 Package {
                     name: "P1".into(),
                     weight: 5,
-                    station_pair_name: ("B".into(), "A".into()),
+                    from_to: ("B".into(), "A".into()),
                 },
                 Package {
                     name: "P2".into(),
                     weight: 5,
-                    station_pair_name: ("D".into(), "E".into()),
+                    from_to: ("D".into(), "E".into()),
                 },
             ],
             trains: vec![Train {
@@ -328,19 +328,19 @@ pub mod case {
             stations: vec![Station { name: "A".into() }, Station { name: "B".into() }],
             routes: vec![Route {
                 name: "AB".into(),
-                station_pair_name: ("A".into(), "B".into()),
+                from_to: ("A".into(), "B".into()),
                 travel_time: 10,
             }],
             packages: vec![
                 Package {
                     name: "P1".into(),
                     weight: 5,
-                    station_pair_name: ("A".into(), "B".into()),
+                    from_to: ("A".into(), "B".into()),
                 },
                 Package {
                     name: "P2".into(),
                     weight: 5,
-                    station_pair_name: ("A".into(), "B".into()),
+                    from_to: ("A".into(), "B".into()),
                 },
             ],
             trains: vec![Train {
@@ -365,19 +365,19 @@ pub mod case {
             stations: vec![Station { name: "A".into() }, Station { name: "B".into() }],
             routes: vec![Route {
                 name: "AB".into(),
-                station_pair_name: ("A".into(), "B".into()),
+                from_to: ("A".into(), "B".into()),
                 travel_time: 10,
             }],
             packages: vec![
                 Package {
                     name: "P1".into(),
                     weight: 5,
-                    station_pair_name: ("A".into(), "B".into()),
+                    from_to: ("A".into(), "B".into()),
                 },
                 Package {
                     name: "P2".into(),
                     weight: 5,
-                    station_pair_name: ("A".into(), "B".into()),
+                    from_to: ("A".into(), "B".into()),
                 },
             ],
             trains: vec![Train {
@@ -412,12 +412,12 @@ pub mod case {
             routes: vec![
                 Route {
                     name: "AB1".into(),
-                    station_pair_name: ("A1".into(), "B1".into()),
+                    from_to: ("A1".into(), "B1".into()),
                     travel_time: 10,
                 },
                 Route {
                     name: "AB2".into(),
-                    station_pair_name: ("A2".into(), "B2".into()),
+                    from_to: ("A2".into(), "B2".into()),
                     travel_time: 20,
                 },
             ],
@@ -425,12 +425,12 @@ pub mod case {
                 Package {
                     name: "P1".into(),
                     weight: 5,
-                    station_pair_name: ("A1".into(), "B1".into()),
+                    from_to: ("A1".into(), "B1".into()),
                 },
                 Package {
                     name: "P2".into(),
                     weight: 5,
-                    station_pair_name: ("A2".into(), "B2".into()),
+                    from_to: ("A2".into(), "B2".into()),
                 },
             ],
             trains: vec![

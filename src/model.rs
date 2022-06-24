@@ -108,7 +108,7 @@ impl From<args::Station> for Station {
 #[derive(Debug, Clone)]
 pub struct Route {
     pub name: String,
-    pub station_pair: (Station, Station),
+    pub from_to: (Station, Station),
     pub travel_time: u32,
 }
 
@@ -128,11 +128,11 @@ impl Hash for Route {
 
 impl Route {
     pub fn from(&self) -> &Station {
-        &self.station_pair.0
+        &self.from_to.0
     }
 
     pub fn to(&self) -> &Station {
-        &self.station_pair.1
+        &self.from_to.1
     }
 
     pub fn is_from(&self, station: &Station) -> bool {
@@ -150,18 +150,15 @@ impl TryFrom<(args::Route, &[Station])> for Route {
     fn try_from((route, stations): (args::Route, &[Station])) -> Result<Self, Self::Error> {
         let args::Route {
             name,
-            station_pair_name: (from_name, to_name),
+            from_to: (from, to),
             travel_time,
         } = route;
 
-        let station_pair = (
-            find_station(stations, from_name)?,
-            find_station(stations, to_name)?,
-        );
+        let from_to = (find_station(stations, from)?, find_station(stations, to)?);
 
         Ok(Self {
             name,
-            station_pair,
+            from_to,
             travel_time,
         })
     }
@@ -171,16 +168,16 @@ impl TryFrom<(args::Route, &[Station])> for Route {
 pub struct Package {
     pub name: String,
     pub weight: u32,
-    pub station_pair: (Station, Station),
+    pub from_to: (Station, Station),
 }
 
 impl Package {
     pub fn from(&self) -> &Station {
-        &self.station_pair.0
+        &self.from_to.0
     }
 
     pub fn to(&self) -> &Station {
-        &self.station_pair.1
+        &self.from_to.1
     }
 
     fn actions(&self) -> Vec<state::Action> {
@@ -198,18 +195,15 @@ impl TryFrom<(args::Package, &[Station])> for Package {
         let args::Package {
             name,
             weight,
-            station_pair_name: (from_name, to_name),
+            from_to: (from, to),
         } = package;
 
-        let station_pair = (
-            find_station(stations, from_name)?,
-            find_station(stations, to_name)?,
-        );
+        let from_to = (find_station(stations, from)?, find_station(stations, to)?);
 
         Ok(Self {
             name,
             weight,
-            station_pair,
+            from_to,
         })
     }
 }

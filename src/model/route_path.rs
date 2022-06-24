@@ -10,7 +10,7 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RoutePath {
-    pub station_pair: (Station, Station),
+    pub from_to: (Station, Station),
     pub routes: Vec<Route>,
 }
 
@@ -30,9 +30,9 @@ impl TryFrom<(&[Station], &[Route])> for RoutePath {
         let stations_except_first = stations.iter().skip(1);
         let stations_except_last = stations.iter().take(stations.len() - 1);
 
-        let station_pairs_chain = zip(stations_except_last, stations_except_first);
+        let from_to_chain = zip(stations_except_last, stations_except_first);
 
-        let routes = station_pairs_chain
+        let routes = from_to_chain
             .map(|(from, to)| {
                 all_routes
                     .iter()
@@ -43,7 +43,7 @@ impl TryFrom<(&[Station], &[Route])> for RoutePath {
             .collect_vec();
 
         Ok(Self {
-            station_pair: (first.clone(), last.clone()),
+            from_to: (first.clone(), last.clone()),
             routes,
         })
     }
@@ -58,7 +58,7 @@ impl Network {
         HashMap::from_iter(zip(
             all_shortest_route_paths
                 .iter()
-                .map(|r| r.station_pair.clone()),
+                .map(|route_path| route_path.from_to.clone()),
             all_shortest_route_paths.iter().cloned(),
         ))
     }
@@ -68,10 +68,10 @@ impl Network {
             .stations
             .iter()
             .map(|station| RoutePath {
-                station_pair: (station.clone(), station.clone()),
+                from_to: (station.clone(), station.clone()),
                 routes: vec![Route {
                     name: format!("{}#id", station.name),
-                    station_pair: (station.clone(), station.clone()),
+                    from_to: (station.clone(), station.clone()),
                     travel_time: 0,
                 }],
             })
