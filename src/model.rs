@@ -102,6 +102,16 @@ pub struct Route {
     pub travel_time: u32,
 }
 
+impl Route {
+    fn identity(station: &Station) -> Self {
+        Self {
+            name: format!("{}#id", station.name),
+            from_to: (station.clone(), station.clone()),
+            travel_time: 0,
+        }
+    }
+}
+
 impl PartialEq for Route {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
@@ -315,7 +325,10 @@ pub mod test {
             fn $case_name() {
                 let network = case::$case_name();
 
-                assert_eq!(network.optimal_state().travel_time_used(), $expected_time);
+                assert_eq!(
+                    network.optimal_itinerary().travel_time_used(),
+                    $expected_time
+                );
             }
         };
     }

@@ -69,11 +69,7 @@ impl Network {
             .iter()
             .map(|station| RoutePath {
                 from_to: (station.clone(), station.clone()),
-                routes: vec![Route {
-                    name: format!("{}#id", station.name),
-                    from_to: (station.clone(), station.clone()),
-                    travel_time: 0,
-                }],
+                routes: vec![Route::identity(station)],
             })
             .collect_vec();
 
