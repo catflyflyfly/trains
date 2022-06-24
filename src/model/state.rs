@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::rc::Rc;
@@ -12,24 +11,6 @@ use super::*;
 pub enum Action {
     Pick(Package, Station),
     Drop(Package, Station),
-}
-
-impl PartialOrd for Action {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Action {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (Action::Pick(_, _), Action::Pick(_, _)) | (Action::Drop(_, _), Action::Drop(_, _)) => {
-                Ordering::Equal
-            }
-            (Action::Pick(_, _), Action::Drop(_, _)) => Ordering::Less,
-            (Action::Drop(_, _), Action::Pick(_, _)) => Ordering::Greater,
-        }
-    }
 }
 
 impl Action {
