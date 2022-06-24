@@ -1,4 +1,4 @@
-cargo run --\
+bin/trains\
   --station a\
   --station b\
   --station c\
