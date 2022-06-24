@@ -299,7 +299,16 @@ impl<'a> Train<'a> {
 
                 instructions
             })
-            .collect_vec()
+            .fold(vec![], |mut acc, next| match acc.pop() {
+                Some(last) => {
+                    acc.extend(last.combine(next));
+                    acc
+                }
+                None => {
+                    acc.push(next);
+                    acc
+                }
+            })
     }
 
     fn sub_instructions(
@@ -327,7 +336,7 @@ impl<'a> Train<'a> {
                     .route(route.clone());
 
                 let _ = match (is_last(index), action) {
-                    (true, Action::Drop(p, _)) => builder.dropped_package(p.clone()),
+                    (true, Action::Drop(p, _)) => builder.dropped_package(vec![p.clone()]),
                     _ => &builder,
                 };
 
@@ -344,8 +353,8 @@ impl<'a> Train<'a> {
                 begin_at,
                 train: self.train.clone(),
                 route: Route::identity(station),
-                picked_package: Some(package.clone()),
-                dropped_package: None,
+                picked_package: vec![package.clone()],
+                dropped_package: vec![],
             })
         }
 
@@ -410,11 +419,11 @@ pub mod test {
             vec![pick_p2.clone(), drop_p2.clone()],
             vec![pick_p2.clone()],
             60,
-            3,
+            2,
             false,
             0,
             60,
-            3,
+            2,
         );
 
         state.train_states[0].take_action(pick_p2);
@@ -425,11 +434,11 @@ pub mod test {
             vec![drop_p2.clone()],
             vec![drop_p2.clone()],
             160,
-            7,
+            6,
             false,
             5,
             160,
-            7,
+            6,
         );
 
         state.train_states[0].take_action(drop_p2);
@@ -445,11 +454,11 @@ pub mod test {
             vec![],
             vec![],
             170,
-            8,
+            6,
             true,
             0,
             170,
-            8,
+            6,
         );
     }
 
@@ -488,11 +497,11 @@ pub mod test {
             vec![drop_p1.clone(), pick_p2.clone(), drop_p2.clone()],
             vec![drop_p1.clone()],
             0,
-            2,
+            1,
             false,
             5,
             0,
-            2,
+            1,
         );
 
         state.train_states[0].take_action(drop_p1);
@@ -503,11 +512,11 @@ pub mod test {
             vec![pick_p2.clone(), drop_p2.clone()],
             vec![pick_p2.clone()],
             10,
-            3,
+            1,
             false,
             0,
             10,
-            3,
+            1,
         );
 
         state.train_states[0].take_action(pick_p2);
@@ -518,11 +527,11 @@ pub mod test {
             vec![drop_p2.clone()],
             vec![drop_p2.clone()],
             20,
-            5,
+            3,
             false,
             5,
             20,
-            5,
+            3,
         );
 
         state.train_states[0].take_action(drop_p2);
@@ -538,11 +547,11 @@ pub mod test {
             vec![],
             vec![],
             30,
-            6,
+            3,
             true,
             0,
             30,
-            6,
+            3,
         );
     }
 

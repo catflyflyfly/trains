@@ -29,7 +29,7 @@ impl Network {
             .collect_vec()
     }
 
-    pub fn optimal_itinerary<'a>(&'a self) -> state::Network<'a> {
+    pub fn optimal_itinerary(&self) -> state::Network {
         dijkstra(
             &state::Network::new(self),
             |state| state.take_available_actions(),
@@ -240,10 +240,42 @@ pub struct Instruction {
     pub begin_at: u32,
     pub train: Train,
     pub route: Route,
-    #[builder(setter(into, strip_option), default)]
-    pub picked_package: Option<Package>,
-    #[builder(setter(into, strip_option), default)]
-    pub dropped_package: Option<Package>,
+    #[builder(default)]
+    pub picked_package: Vec<Package>,
+    #[builder(default)]
+    pub dropped_package: Vec<Package>,
+}
+
+impl Instruction {
+    fn combine(self, other: Instruction) -> Vec<Instruction> {
+        let is_same_train = self.train == other.train;
+
+        if is_same_train
+            && other.picked_package.is_empty()
+            && self.route.to().clone() == other.route.to().clone()
+        {
+            vec![Instruction {
+                begin_at: self.begin_at,
+                train: self.train,
+                route: self.route,
+                picked_package: self.picked_package,
+                dropped_package: vec![self.dropped_package, other.dropped_package].concat(),
+            }]
+        } else if is_same_train
+            && self.dropped_package.is_empty()
+            && self.route.from().clone() == other.route.from().clone()
+        {
+            vec![Instruction {
+                begin_at: self.begin_at,
+                train: self.train,
+                route: other.route,
+                dropped_package: other.dropped_package,
+                picked_package: vec![self.picked_package, other.picked_package].concat(),
+            }]
+        } else {
+            vec![self, other]
+        }
+    }
 }
 
 fn find_station(stations: &[Station], station_name: String) -> Result<Station> {
@@ -259,17 +291,17 @@ impl std::fmt::Display for Instruction {
         let picked_package_name = format!(
             "[{}]",
             self.picked_package
-                .as_ref()
+                .iter()
                 .map(|package| package.name.clone())
-                .unwrap_or_else(|| "".to_string())
+                .join(", ")
         );
 
         let dropped_package_name = format!(
             "[{}]",
             self.dropped_package
-                .as_ref()
+                .iter()
                 .map(|package| package.name.clone())
-                .unwrap_or_else(|| "".to_string())
+                .join(", ")
         );
         let val = vec![
             ("W", self.begin_at.to_string()),
@@ -277,7 +309,7 @@ impl std::fmt::Display for Instruction {
             ("N1", self.route.from().name.clone()),
             ("P1", picked_package_name),
             ("N2", self.route.to().name.clone()),
-            ("N2", dropped_package_name),
+            ("P2", dropped_package_name),
         ];
 
         let mut str = "";
