@@ -387,4 +387,64 @@ pub mod case {
             }],
         }
     }
+
+    //    10
+    // A1----B1
+    //
+    // A2----B2
+    //    20
+    //
+    // T1, 5, A
+    // T2, 5, A
+    // P1, 5, A1 -> B1
+    // P2, 5, A2 -> B2
+    //
+    // Solution: 20     A1-B1 + A2-B2
+    //
+    pub fn multiple_packages_islands() -> Network {
+        Network {
+            stations: vec![
+                Station { name: "A1".into() },
+                Station { name: "B1".into() },
+                Station { name: "A2".into() },
+                Station { name: "B2".into() },
+            ],
+            routes: vec![
+                Route {
+                    name: "AB1".into(),
+                    station_pair_name: ("A1".into(), "B1".into()),
+                    duration_mins: 10,
+                },
+                Route {
+                    name: "AB2".into(),
+                    station_pair_name: ("A2".into(), "B2".into()),
+                    duration_mins: 20,
+                },
+            ],
+            packages: vec![
+                Package {
+                    name: "P1".into(),
+                    weight: 5,
+                    station_pair_name: ("A1".into(), "B1".into()),
+                },
+                Package {
+                    name: "P2".into(),
+                    weight: 5,
+                    station_pair_name: ("A2".into(), "B2".into()),
+                },
+            ],
+            trains: vec![
+                Train {
+                    name: "T1".into(),
+                    capacity: 5,
+                    initial_station_name: "A1".into(),
+                },
+                Train {
+                    name: "T2".into(),
+                    capacity: 5,
+                    initial_station_name: "A2".into(),
+                },
+            ],
+        }
+    }
 }

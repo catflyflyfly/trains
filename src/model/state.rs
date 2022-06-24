@@ -1,7 +1,11 @@
 use std::cmp::Ordering;
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::rc::Rc;
 
 use itertools::Either;
 
+use super::route_path::RouteMap;
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -48,22 +52,23 @@ impl Action {
 pub struct Network {
     pub train_states: Vec<Train>,
     required_actions: Vec<Action>,
-    optimal_route_paths_map: HashMap<(Station, Station), RoutePath>,
 }
 
 impl Network {
     pub(super) fn new(network: &super::Network) -> Self {
-        state::Network {
+        let route_map = Rc::new(network.all_shortest_route_paths_map());
+
+        Self {
             train_states: network
                 .trains
                 .iter()
                 .map(|train| Train {
                     train: train.clone(),
                     taken_actions: vec![],
+                    route_map: route_map.clone(),
                 })
                 .collect_vec(),
             required_actions: network.actions(),
-            optimal_route_paths_map: network.all_shortest_route_paths_map(),
         }
     }
 
@@ -74,7 +79,7 @@ impl Network {
     pub fn instructions(&self) -> Vec<Instruction> {
         self.train_states
             .iter()
-            .flat_map(|state| state.instructions(&self.optimal_route_paths_map))
+            .flat_map(|state| state.instructions())
             .collect_vec()
     }
 
@@ -148,13 +153,13 @@ impl Network {
     fn optimal_duration_mins(&self) -> u32 {
         self.train_states
             .iter()
-            .map(|state| state.optimal_duration_mins(&self.optimal_route_paths_map))
+            .map(|state| state.optimal_duration_mins())
             .max()
             .unwrap()
     }
 }
 
-impl std::fmt::Debug for Network {
+impl Debug for Network {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Network")
             .field("train_states", &self.train_states)
@@ -168,16 +173,30 @@ impl PartialEq for Network {
     }
 }
 
-impl std::hash::Hash for Network {
+impl Hash for Network {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.train_states.hash(state);
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Eq)]
 pub struct Train {
     pub train: super::Train,
     pub taken_actions: Vec<Action>,
+    route_map: Rc<RouteMap>,
+}
+
+impl PartialEq for Train {
+    fn eq(&self, other: &Self) -> bool {
+        self.train == other.train && self.taken_actions == other.taken_actions
+    }
+}
+
+impl Hash for Train {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.train.hash(state);
+        self.taken_actions.hash(state);
+    }
 }
 
 impl Train {
@@ -200,7 +219,14 @@ impl Train {
     }
 
     fn can_pick(&self, package: &Package) -> bool {
-        package.weight + self.current_weight() <= self.train.capacity
+        let is_route_exist = self
+            .route_map
+            .get(&(self.train.initial_station.clone(), package.from().clone()))
+            .is_some();
+
+        let is_enough_room = package.weight + self.current_weight() <= self.train.capacity;
+
+        is_route_exist && is_enough_room
     }
 
     fn can_drop(&self, package: &Package) -> bool {
@@ -231,20 +257,14 @@ impl Train {
             .collect()
     }
 
-    fn optimal_duration_mins(
-        &self,
-        optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
-    ) -> u32 {
-        self.optimal_route_paths(optimal_route_paths_map)
+    fn optimal_duration_mins(&self) -> u32 {
+        self.optimal_route_paths()
             .iter()
             .map(|state| state.total_duration_mins())
             .sum()
     }
 
-    fn optimal_route_paths(
-        &self,
-        optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
-    ) -> Vec<RoutePath> {
+    fn optimal_route_paths(&self) -> Vec<RoutePath> {
         if self.taken_actions.is_empty() {
             return vec![];
         }
@@ -268,14 +288,14 @@ impl Train {
         let pairs = zip(froms, tos);
 
         pairs
-            .map(|pair| optimal_route_paths_map.get(&pair).unwrap().clone())
+            .map(|pair| self.route_map.get(&pair).unwrap().clone())
             .collect_vec()
     }
 
     fn sub_instructions(
         &self,
         route_path: &RoutePath,
-        action: &state::Action,
+        action: &Action,
         begin_at: u32,
     ) -> Vec<Instruction> {
         let route_len = route_path.routes.len();
@@ -311,11 +331,8 @@ impl Train {
             .collect_vec()
     }
 
-    fn instructions(
-        &self,
-        optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
-    ) -> Vec<Instruction> {
-        let route_paths = self.optimal_route_paths(optimal_route_paths_map);
+    fn instructions(&self) -> Vec<Instruction> {
+        let route_paths = self.optimal_route_paths();
         let taken_actions = &self.taken_actions;
 
         let mut begin_at = 0;
@@ -585,13 +602,11 @@ pub mod test {
         assert_eq!(state.is_success(), is_success);
         assert_eq!(state.train_states[0].current_weight(), train_current_weight);
         assert_eq!(
-            state.train_states[0].optimal_duration_mins(&state.optimal_route_paths_map),
+            state.train_states[0].optimal_duration_mins(),
             train_optimal_duration_mins
         );
         assert_eq!(
-            state.train_states[0]
-                .instructions(&state.optimal_route_paths_map)
-                .len(),
+            state.train_states[0].instructions().len(),
             train_instructions_len
         );
     }

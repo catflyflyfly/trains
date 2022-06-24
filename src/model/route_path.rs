@@ -49,8 +49,10 @@ impl TryFrom<(&[Station], &[Route])> for RoutePath {
     }
 }
 
+pub type RouteMap = HashMap<(Station, Station), RoutePath>;
+
 impl Network {
-    pub fn all_shortest_route_paths_map(&self) -> HashMap<(Station, Station), RoutePath> {
+    pub fn all_shortest_route_paths_map(&self) -> RouteMap {
         let all_shortest_route_paths = self.all_shortest_route_paths();
 
         HashMap::from_iter(zip(
