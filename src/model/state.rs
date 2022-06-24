@@ -1,31 +1,16 @@
-use std::cmp::Ordering;
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::rc::Rc;
 
 use itertools::Either;
 
+use super::route_path::RouteMap;
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Action {
     Pick(Package, Station),
     Drop(Package, Station),
-}
-
-impl PartialOrd for Action {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Action {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (Action::Pick(_, _), Action::Pick(_, _)) | (Action::Drop(_, _), Action::Drop(_, _)) => {
-                Ordering::Equal
-            }
-            (Action::Pick(_, _), Action::Drop(_, _)) => Ordering::Less,
-            (Action::Drop(_, _), Action::Pick(_, _)) => Ordering::Greater,
-        }
-    }
 }
 
 impl Action {
@@ -45,25 +30,26 @@ impl Action {
 }
 
 #[derive(Clone, Eq)]
-pub struct Network {
-    pub train_states: Vec<Train>,
+pub struct Network<'a> {
+    pub train_states: Vec<Train<'a>>,
     required_actions: Vec<Action>,
-    optimal_route_paths_map: HashMap<(Station, Station), RoutePath>,
 }
 
-impl Network {
-    pub(super) fn new(network: &super::Network) -> Self {
-        state::Network {
+impl<'a> Network<'a> {
+    pub(super) fn new(network: &'a super::Network) -> Self {
+        let route_map = Rc::new(network.all_shortest_route_paths_map());
+
+        Self {
             train_states: network
                 .trains
                 .iter()
                 .map(|train| Train {
-                    train: train.clone(),
+                    train,
                     taken_actions: vec![],
+                    route_map: route_map.clone(),
                 })
                 .collect_vec(),
             required_actions: network.actions(),
-            optimal_route_paths_map: network.all_shortest_route_paths_map(),
         }
     }
 
@@ -71,14 +57,14 @@ impl Network {
         self.available_actions().is_empty()
     }
 
-    pub fn instructions(&self) -> Vec<Instruction> {
+    pub(super) fn instructions(&self) -> Vec<Instruction> {
         self.train_states
             .iter()
-            .flat_map(|state| state.instructions(&self.optimal_route_paths_map))
+            .flat_map(|state| state.instructions())
             .collect_vec()
     }
 
-    pub(super) fn take_available_actions(&self) -> Vec<(Network, u32)> {
+    pub(super) fn take_available_actions(&self) -> Vec<(Network<'a>, u32)> {
         let untaken_actions = self.untaken_actions();
         let current_total_durations = self.optimal_duration_mins();
 
@@ -148,13 +134,13 @@ impl Network {
     fn optimal_duration_mins(&self) -> u32 {
         self.train_states
             .iter()
-            .map(|state| state.optimal_duration_mins(&self.optimal_route_paths_map))
+            .map(|state| state.optimal_duration_mins())
             .max()
             .unwrap()
     }
 }
 
-impl std::fmt::Debug for Network {
+impl<'a> Debug for Network<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Network")
             .field("train_states", &self.train_states)
@@ -162,30 +148,44 @@ impl std::fmt::Debug for Network {
     }
 }
 
-impl PartialEq for Network {
+impl<'a> PartialEq for Network<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.train_states == other.train_states
     }
 }
 
-impl std::hash::Hash for Network {
+impl<'a> Hash for Network<'a> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.train_states.hash(state);
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Train {
-    pub train: super::Train,
+#[derive(Debug, Clone, Eq)]
+pub struct Train<'a> {
+    pub train: &'a super::Train,
     pub taken_actions: Vec<Action>,
+    route_map: Rc<RouteMap>,
 }
 
-impl Train {
+impl<'a> PartialEq for Train<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.train == other.train && self.taken_actions == other.taken_actions
+    }
+}
+
+impl<'a> Hash for Train<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.train.hash(state);
+        self.taken_actions.hash(state);
+    }
+}
+
+impl<'a> Train<'a> {
     fn take_action(&mut self, action: &Action) {
         self.taken_actions.push(action.clone());
     }
 
-    fn available_actions<'a>(&'a self, actions: &'a [Action]) -> Vec<&Action> {
+    fn available_actions<'b>(&'b self, actions: &'b [Action]) -> Vec<&Action> {
         actions
             .iter()
             .filter(|action| self.can_take(action))
@@ -200,7 +200,14 @@ impl Train {
     }
 
     fn can_pick(&self, package: &Package) -> bool {
-        package.weight + self.current_weight() <= self.train.capacity
+        let is_route_exist = self
+            .route_map
+            .get(&(self.train.initial_station.clone(), package.from().clone()))
+            .is_some();
+
+        let is_enough_room = package.weight + self.current_weight() <= self.train.capacity;
+
+        is_route_exist && is_enough_room
     }
 
     fn can_drop(&self, package: &Package) -> bool {
@@ -231,20 +238,14 @@ impl Train {
             .collect()
     }
 
-    fn optimal_duration_mins(
-        &self,
-        optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
-    ) -> u32 {
-        self.optimal_route_paths(optimal_route_paths_map)
+    fn optimal_duration_mins(&self) -> u32 {
+        self.optimal_route_paths()
             .iter()
             .map(|state| state.total_duration_mins())
             .sum()
     }
 
-    fn optimal_route_paths(
-        &self,
-        optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
-    ) -> Vec<RoutePath> {
+    fn optimal_route_paths(&self) -> Vec<RoutePath> {
         if self.taken_actions.is_empty() {
             return vec![];
         }
@@ -268,14 +269,14 @@ impl Train {
         let pairs = zip(froms, tos);
 
         pairs
-            .map(|pair| optimal_route_paths_map.get(&pair).unwrap().clone())
+            .map(|pair| self.route_map.get(&pair).unwrap().clone())
             .collect_vec()
     }
 
     fn sub_instructions(
         &self,
         route_path: &RoutePath,
-        action: &state::Action,
+        action: &Action,
         begin_at: u32,
     ) -> Vec<Instruction> {
         let route_len = route_path.routes.len();
@@ -311,11 +312,8 @@ impl Train {
             .collect_vec()
     }
 
-    fn instructions(
-        &self,
-        optimal_route_paths_map: &HashMap<(Station, Station), RoutePath>,
-    ) -> Vec<Instruction> {
-        let route_paths = self.optimal_route_paths(optimal_route_paths_map);
+    fn instructions(&self) -> Vec<Instruction> {
+        let route_paths = self.optimal_route_paths();
         let taken_actions = &self.taken_actions;
 
         let mut begin_at = 0;
@@ -332,30 +330,34 @@ impl Train {
     }
 }
 
-#[cfg(test)]
-pub mod case {
-    use super::*;
-    use crate::model;
+// #[cfg(test)]
+// pub mod case {
+//     use super::*;
+//     use crate::model;
 
-    macro_rules! from_model {
-        ($case_name:ident) => {
-            pub fn $case_name() -> Network {
-                Network::new(&model::case::$case_name())
-            }
-        };
-    }
+//     macro_rules! from_model {
+//         ($case_name:ident) => {
+//             pub fn $case_name() -> Network {
+//                 Network::new(&model::case::$case_name())
+//             }
+//         };
+//     }
 
-    from_model!(diverge);
-    from_model!(multiple_packages_small_train);
-}
+//     from_model!(diverge);
+//     from_model!(multiple_packages_small_train);
+// }
 
 #[cfg(test)]
 pub mod test {
     use super::*;
 
+    use crate::model::case;
+
     #[test]
     fn train_take_action_diverge() {
-        let mut state = case::diverge();
+        let network = case::diverge();
+
+        let mut state = Network::new(&network);
 
         let possible_actions = &state.required_actions;
 
@@ -447,8 +449,9 @@ pub mod test {
 
     #[test]
     fn train_take_action_multiple_packages_small_train() {
-        let mut state = case::multiple_packages_small_train();
+        let network = case::multiple_packages_small_train();
 
+        let mut state = Network::new(&network);
         let possible_actions = &state.required_actions;
 
         let (pick_p1, drop_p1, pick_p2, drop_p2) = possible_actions.iter().collect_tuple().unwrap();
@@ -539,7 +542,9 @@ pub mod test {
 
     #[test]
     fn network_take_available_actions_diverge() {
-        let state = case::diverge();
+        let network = case::diverge();
+
+        let state = Network::new(&network);
 
         let successor_states = state.take_available_actions();
         assert_eq!(successor_states.len(), 2);
@@ -585,13 +590,11 @@ pub mod test {
         assert_eq!(state.is_success(), is_success);
         assert_eq!(state.train_states[0].current_weight(), train_current_weight);
         assert_eq!(
-            state.train_states[0].optimal_duration_mins(&state.optimal_route_paths_map),
+            state.train_states[0].optimal_duration_mins(),
             train_optimal_duration_mins
         );
         assert_eq!(
-            state.train_states[0]
-                .instructions(&state.optimal_route_paths_map)
-                .len(),
+            state.train_states[0].instructions().len(),
             train_instructions_len
         );
     }

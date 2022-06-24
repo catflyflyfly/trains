@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::hash::Hash;
 use std::ops::Deref;
 
 use anyhow::{anyhow, bail, Error, Result};
@@ -120,7 +120,7 @@ impl PartialEq for Route {
 
 impl Eq for Route {}
 
-impl std::hash::Hash for Route {
+impl Hash for Route {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
     }
@@ -335,6 +335,7 @@ pub mod case {
     from_args!(diverge);
     from_args!(multiple_packages_small_train);
     from_args!(multiple_packages_big_train);
+    from_args!(multiple_packages_islands);
 }
 
 #[cfg(test)]
@@ -361,4 +362,5 @@ pub mod test {
     test_solve_train_network!(diverge, 160);
     test_solve_train_network!(multiple_packages_small_train, 30);
     test_solve_train_network!(multiple_packages_big_train, 10);
+    test_solve_train_network!(multiple_packages_islands, 20);
 }
